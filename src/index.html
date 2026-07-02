@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fabre - Flow-based Agent Builder & Runtime Engine</title>
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-cyber-dark">
+  <!-- Main Grid Layout -->
+  <div id="app-container">
+    <!-- Header -->
+    <header id="app-header">
+      <div class="logo-area">
+        <svg class="logo-icon" viewBox="0 0 24 24" width="24" height="24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="logo-text">FABRE</span>
+        <span class="logo-version">v0.1.0</span>
+      </div>
+      
+      <!-- Top controls & statuses -->
+      <div class="header-status-bar">
+        <div id="provider-badge" class="status-badge warning">
+          <span class="badge-dot"></span>
+          <span id="provider-badge-text" class="badge-text" data-i18n="status_llm_not_configured">LLM: Not Configured</span>
+        </div>
+        <div id="dir-badge" class="status-badge info">
+          <span class="badge-dot"></span>
+          <span id="dir-badge-text" class="badge-text" data-i18n="status_folder_disconnected">Local Folder: Disconnected</span>
+        </div>
+        <button id="connect-dir-btn" class="btn btn-secondary btn-sm">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span data-i18n="btn_connect_dir">Connect Directory</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Workspace Main Container -->
+    <div id="workspace-container">
+      <!-- Left Sidebar: Palette -->
+      <aside id="palette-sidebar">
+        <div class="panel-header">
+          <h3 data-i18n="palette_title">Palette</h3>
+          <span class="subtitle" data-i18n="palette_subtitle">Drag or Click to Add</span>
+        </div>
+        <div class="palette-items">
+          <button class="palette-item" data-node-type="start" title="エージェントの開始地点。ファイル選択などで初期入力を与えます。">
+            <div class="palette-icon start-color">▶</div>
+            <span data-i18n="node_start">Start Node</span>
+          </button>
+          <button class="palette-item" data-node-type="prompt" title="変数を埋め込んでLLMのプロンプトを構築します。">
+            <div class="palette-icon prompt-color">✎</div>
+            <span data-i18n="node_prompt">Prompt Builder</span>
+          </button>
+          <button class="palette-item" data-node-type="llm" title="Chrome組み込みAIまたは外部APIでLLMを実行します。">
+            <div class="palette-icon llm-color">🤖</div>
+            <span data-i18n="node_llm">LLM Call</span>
+          </button>
+          <button class="palette-item" data-node-type="extractor" title="応答からJSONキーやコードブロックをノンコーディングで抽出します。">
+            <div class="palette-icon extractor-color">⚲</div>
+            <span data-i18n="node_extractor">Extractor</span>
+          </button>
+          <button class="palette-item" data-node-type="condition" title="条件（ContainsやRegexなど）で処理の流れを分岐します。">
+            <div class="palette-icon condition-color">⇅</div>
+            <span data-i18n="node_condition">Condition</span>
+          </button>
+          <button class="palette-item" data-node-type="set_var" title="現在の変数メモリに値を保存します。">
+            <div class="palette-icon setvar-color">⛃</div>
+            <span data-i18n="node_setvar">Set Variable</span>
+          </button>
+          <button class="palette-item" data-node-type="tool" title="ファイルの読み書きや模擬テストなどのツールを動かします。">
+            <div class="palette-icon tool-color">🛠</div>
+            <span data-i18n="node_tool">Tool Exec</span>
+          </button>
+          <button class="palette-item" data-node-type="output" title="最終結果を出力して記録します。">
+            <div class="palette-icon output-color">■</div>
+            <span data-i18n="node_output">Output Node</span>
+          </button>
+        </div>
+
+        <!-- Sidebar File Tree (Visible once directory is picked) -->
+        <div id="file-tree-container" class="collapsed">
+          <div class="panel-header border-top">
+            <h3 data-i18n="dir_title">Target Directory</h3>
+          </div>
+          <div id="file-tree" class="file-tree-list">
+            <span class="placeholder-text" data-i18n="dir_placeholder">Connect a directory to browse files</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Node Editor Canvas -->
+      <main id="canvas-area">
+        <!-- Dot Grid Canvas Wrapper -->
+        <div id="canvas-viewport">
+          <div id="node-canvas">
+            <!-- SVG overlay for rendering connections -->
+            <svg id="connections-overlay" width="100%" height="100%">
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 2 L 8 5 L 0 8 z" fill="rgba(255,255,255,0.3)" />
+                </marker>
+                <linearGradient id="active-pulse" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#38bdf8" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+              <g id="links-group"></g>
+              <path id="temp-link" d="" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-dasharray="5,5" style="display: none;" />
+            </svg>
+            <div id="nodes-container">
+              <!-- Nodes dynamically generated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas Controls (Zoom / Pan Reset / Clear) -->
+        <div class="canvas-controls">
+          <button id="zoom-in-btn" class="control-btn" title="Zoom In">+</button>
+          <button id="zoom-out-btn" class="control-btn" title="Zoom Out">-</button>
+          <button id="zoom-reset-btn" class="control-btn" title="Reset Pan & Zoom">100%</button>
+          <button id="clear-canvas-btn" class="control-btn danger" data-i18n-title="clear_canvas" title="Clear Canvas">Clear</button>
+        </div>
+      </main>
+
+      <!-- Right Sidebar: Panels -->
+      <aside id="inspector-sidebar">
+        <!-- Tab Headers -->
+        <div class="tabs-header">
+          <button class="tab-btn active" data-tab="tab-control" data-i18n="tab_runner">Runner</button>
+          <button class="tab-btn" data-tab="tab-vars" data-i18n="tab_memory">Memory</button>
+          <button class="tab-btn" data-tab="tab-logs" data-i18n="tab_logs">Logs</button>
+          <button class="tab-btn" data-tab="tab-settings" data-i18n="tab_config">Config</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tab-contents">
+          <!-- 1. Control & Debug Panel -->
+          <div id="tab-control" class="tab-content active">
+            <div class="control-section">
+              <h4 data-i18n="runner_control_title">Execution Control</h4>
+              <div class="runner-controls-row">
+                <button id="run-btn" class="btn btn-primary" title="自動実行を開始します">
+                  <span class="btn-icon">▶</span> <span data-i18n="btn_run">Run</span>
+                </button>
+                <button id="step-btn" class="btn btn-secondary" title="次の1ステップを実行します">
+                  <span class="btn-icon">➔</span> <span data-i18n="btn_step">Step</span>
+                </button>
+                <button id="pause-btn" class="btn btn-secondary" disabled title="一時停止します">
+                  <span class="btn-icon">‖</span> <span data-i18n="btn_pause">Pause</span>
+                </button>
+                <button id="reset-btn" class="btn btn-danger" title="実行ステートを最初からやり直します">
+                  <span class="btn-icon">↺</span> <span data-i18n="btn_reset">Reset</span>
+                </button>
+              </div>
+
+              <!-- Speed adjustment slider -->
+              <div class="slider-group">
+                <div class="slider-labels">
+                  <label for="speed-slider" data-i18n="label_delay">Step Delay</label>
+                  <span id="speed-value">500ms</span>
+                </div>
+                <input type="range" id="speed-slider" min="100" max="2000" step="100" value="500">
+              </div>
+
+              <!-- Current Runner state view -->
+              <div class="status-summary-card">
+                <div class="summary-row">
+                  <span class="label" data-i18n="runner_status">Status:</span>
+                  <span id="runner-state-badge" class="state-badge idle" data-i18n="status_idle">IDLE</span>
+                </div>
+                <div class="summary-row">
+                  <span class="label" data-i18n="runner_current_node">Current Node:</span>
+                  <span id="current-node-name" class="val-text">-</span>
+                </div>
+                <div class="summary-row">
+                  <span class="label" data-i18n="runner_steps">Steps Run:</span>
+                  <span id="total-steps-val" class="val-text">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Templates Section -->
+            <div class="templates-section">
+              <h4 data-i18n="preset_title">Load Presets</h4>
+              <div class="template-buttons">
+                <button id="template-code-loop" class="template-btn">
+                  <h5 data-i18n="preset_loop_title">Self-Debugging Agent Loop</h5>
+                  <p data-i18n="preset_loop_desc">ローカルコードを検証し、テスト結果をフィードバックしてバグを自己修正するループフロー。</p>
+                </button>
+                <button id="template-basic-chat" class="template-btn">
+                  <h5 data-i18n="preset_chat_title">Simple Chat with Memory</h5>
+                  <p data-i18n="preset_chat_desc">入力プロンプトと変数格納を組み合わせて会話履歴を保持するチャットボット。</p>
+                </button>
+              </div>
+            </div>
+
+            <!-- Node Property Settings (Contextual details for selected node) -->
+            <div id="node-properties-section" class="properties-section collapsed">
+              <div class="properties-header">
+                <h4 data-i18n="props_title">Node Properties</h4>
+                <button id="close-properties-btn" class="close-btn">&times;</button>
+              </div>
+              <div id="properties-content">
+                <p class="placeholder-text" data-i18n="props_placeholder">Select a node to inspect properties</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Variable Watcher -->
+          <div id="tab-vars" class="tab-content">
+            <div class="panel-section-header">
+              <h4 data-i18n="mem_title">Variables Memory</h4>
+              <button id="clear-vars-btn" class="btn btn-secondary btn-xs" data-i18n="btn_clear">Clear</button>
+            </div>
+            <div id="vars-container">
+              <table class="vars-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="th_variable">Variable</th>
+                    <th data-i18n="th_value">Value</th>
+                  </tr>
+                </thead>
+                <tbody id="vars-tbody">
+                  <tr class="empty-row"><td colspan="2" class="placeholder-text" data-i18n="mem_empty">No variables set yet</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. LLM Request/Response Logs -->
+          <div id="tab-logs" class="tab-content">
+            <div class="panel-section-header">
+              <h4 data-i18n="logs_title">Logs & LLM History</h4>
+              <button id="clear-logs-btn" class="btn btn-secondary btn-xs" data-i18n="btn_clear">Clear</button>
+            </div>
+            <div id="logs-container" class="console-logs">
+              <span class="placeholder-text" data-i18n="logs_empty">Logs will appear here during execution...</span>
+            </div>
+          </div>
+
+          <!-- 4. Global Settings Panel -->
+          <div id="tab-settings" class="tab-content">
+            <div class="settings-group">
+              <h4 data-i18n="config_title">Global Config</h4>
+
+              <!-- Language Selection [NEW] -->
+              <div class="form-group">
+                <label for="settings-language" data-i18n="config_lang">Language</label>
+                <select id="settings-language">
+                  <option value="en">English</option>
+                  <option value="ja">日本語</option>
+                </select>
+              </div>
+
+              <!-- Theme Selection [NEW] -->
+              <div class="form-group">
+                <label for="settings-theme" data-i18n="config_theme">Color Theme</label>
+                <select id="settings-theme">
+                  <option value="theme-cyber-dark">Cyber Dark (Neon Blue)</option>
+                  <option value="theme-matrix-green">Matrix Green (Retro Terminal)</option>
+                  <option value="theme-light-slate">Clean Light (Glass Slate)</option>
+                </select>
+              </div>
+
+              <div class="border-top" style="margin-top: 8px; padding-top: 12px;">
+                <h4 data-i18n="config_llm_title">LLM Configuration</h4>
+              </div>
+              
+              <!-- Provider Selection -->
+              <div class="form-group">
+                <label for="settings-provider" data-i18n="config_provider">LLM Provider</label>
+                <select id="settings-provider">
+                  <option value="chrome-ai">Chrome Built-in AI (Gemini Nano)</option>
+                  <option value="openai-compatible">External OpenAI Compatible API</option>
+                </select>
+              </div>
+
+              <!-- Chrome AI Status (Information block) -->
+              <div id="chrome-ai-status-block" class="info-block success">
+                <h5 class="info-title" data-i18n="chrome_ai_title">Chrome Built-in AI</h5>
+                <p id="chrome-ai-desc">Detecting browser capabilities...</p>
+              </div>
+
+              <!-- OpenAI Settings (Shown when OpenAI selected) -->
+              <div id="openai-settings-block" class="settings-sub-block collapsed">
+                <div class="form-group">
+                  <label for="settings-api-url" data-i18n="config_endpoint">API Endpoint URL</label>
+                  <input type="text" id="settings-api-url" placeholder="http://localhost:11434/v1">
+                  <span class="input-helper" data-i18n="config_endpoint_helper">For local Ollama, LM Studio, etc.</span>
+                </div>
+                <div class="form-group">
+                  <label for="settings-api-model" data-i18n="config_model">Model Name</label>
+                  <input type="text" id="settings-api-model" placeholder="qwen2.5-coder:7b">
+                </div>
+                <div class="form-group">
+                  <label for="settings-api-key" data-i18n="config_apikey">API Key (Optional)</label>
+                  <input type="password" id="settings-api-key" placeholder="Enter API Key if needed">
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group border-top">
+              <h4 data-i18n="config_guide_title">Guide & Troubleshooting</h4>
+              <div class="guide-item">
+                <h5 data-i18n="config_cors_title">Local CORS Error</h5>
+                <p data-i18n="config_cors_desc">Ollama などのローカルAPI呼び出しで接続エラーが発生する場合、CORS設定（例: OLLAMA_ORIGINS="*" ollama serve）を確認してください。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- CORS / Network Error Modal Popup Dialog -->
+  <div id="error-modal" class="modal-overlay collapsed">
+    <div class="modal-card">
+      <div class="modal-header">
+        <svg class="modal-error-icon" viewBox="0 0 24 24" width="24" height="24">
+          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h3 data-i18n="modal_error_title">Connection Error Detected</h3>
+        <button id="close-error-modal-btn" class="modal-close-x">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p data-i18n="modal_error_desc">外部LLM APIへの接続に失敗しました。CORS（Cross-Origin Resource Sharing）制限、またはサーバーが起動していないことが原因と考えられます。</p>
+        
+        <div class="code-instructions">
+          <h5 data-i18n="modal_ollama_mac">Ollama CORS Command (macOS / Linux):</h5>
+          <pre><code>OLLAMA_ORIGINS="*" ollama serve</code></pre>
+          <h5 data-i18n="modal_ollama_win">Windows (CMD):</h5>
+          <pre><code>set OLLAMA_ORIGINS=*
+ollama serve</code></pre>
+        </div>
+        <p class="modal-subtext" data-i18n="modal_error_footer">サーバーを上記の環境変数を追加して再起動し、ポート番号（デフォルト: 11434）が正しいことを確認して再試行してください。</p>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-open-settings-btn" class="btn btn-primary" data-i18n="btn_open_settings">Open Settings</button>
+        <button id="modal-close-btn" class="btn btn-secondary" data-i18n="btn_close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standard JS Entry -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
