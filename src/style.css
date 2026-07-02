@@ -841,7 +841,7 @@ body.theme-light-slate .control-btn:hover {
 /* Tabs */
 .tabs-header {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background-color: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid var(--border-color);
 }

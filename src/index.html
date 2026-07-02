@@ -83,15 +83,6 @@
           </button>
         </div>
 
-        <!-- Sidebar File Tree (Visible once directory is picked) -->
-        <div id="file-tree-container" class="collapsed">
-          <div class="panel-header border-top">
-            <h3 data-i18n="dir_title">Target Directory</h3>
-          </div>
-          <div id="file-tree" class="file-tree-list">
-            <span class="placeholder-text" data-i18n="dir_placeholder">Connect a directory to browse files</span>
-          </div>
-        </div>
       </aside>
 
       <!-- Center: Node Editor Canvas -->
@@ -133,6 +124,7 @@
         <!-- Tab Headers -->
         <div class="tabs-header">
           <button class="tab-btn active" data-tab="tab-control" data-i18n="tab_runner">Runner</button>
+          <button class="tab-btn" data-tab="tab-files" data-i18n="tab_files">Files</button>
           <button class="tab-btn" data-tab="tab-vars" data-i18n="tab_memory">Memory</button>
           <button class="tab-btn" data-tab="tab-logs" data-i18n="tab_logs">Logs</button>
           <button class="tab-btn" data-tab="tab-settings" data-i18n="tab_config">Config</button>
@@ -209,6 +201,17 @@
               <div id="properties-content">
                 <p class="placeholder-text" data-i18n="props_placeholder">Select a node to inspect properties</p>
               </div>
+            </div>
+          </div>
+
+          <!-- Files Explorer Panel -->
+          <div id="tab-files" class="tab-content">
+            <div class="panel-section-header">
+              <h4 data-i18n="dir_title">Target Directory</h4>
+              <button id="connect-dir-sidebar-btn" class="btn btn-secondary btn-xs" data-i18n="btn_connect_dir">Connect</button>
+            </div>
+            <div id="file-tree" class="file-tree-list">
+              <span class="placeholder-text" data-i18n="dir_placeholder">Connect a directory to browse files</span>
             </div>
           </div>
 
