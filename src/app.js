@@ -1,6 +1,6 @@
 /**
  * Fabre - Flow-based Agent Builder & Runtime Engine
- * Core Application Script - Phase 1 Complete (with Themes & i18n)
+ * Core Application Script - Phase 2 Complete (Canvas, Drag-Drop, Connections)
  */
 
 'use strict';
@@ -9,7 +9,7 @@
 // 1. Global Application State
 // ==========================================================================
 const state = {
-  // Localization & Themes [NEW]
+  // Localization & Themes
   lang: 'ja', // 'en' | 'ja'
   theme: 'theme-cyber-dark', // 'theme-cyber-dark' | 'theme-matrix-green' | 'theme-light-slate'
 
@@ -26,7 +26,8 @@ const state = {
   // Selection & Connection State
   selectedNodeId: null,
   activeDraggingNodeId: null,
-  activeLinkDrag: null, // { fromNodeId, fromPortId, type, startX, startY }
+  dragOffset: { x: 0, y: 0 },
+  activeLinkDrag: null, // { fromNodeId, fromPortId, type, startX, startY, isInput }
   
   // Runtime Interpreter State
   runnerState: 'idle', // 'idle' | 'running' | 'paused' | 'error' | 'success'
@@ -51,7 +52,120 @@ const state = {
 };
 
 // ==========================================================================
-// 2. Localization Dictionary (i18n) [NEW]
+// 2. Constants & Node Metadata Definitions
+// ==========================================================================
+const NODE_TYPES = {
+  START: 'start',
+  PROMPT: 'prompt',
+  LLM: 'llm',
+  EXTRACTOR: 'extractor',
+  CONDITION: 'condition',
+  SET_VAR: 'set_var',
+  TOOL: 'tool',
+  OUTPUT: 'output'
+};
+
+const NODE_COLORS = {
+  start: 'var(--color-start)',
+  prompt: 'var(--color-prompt)',
+  llm: 'var(--color-llm)',
+  extractor: 'var(--color-extractor)',
+  condition: 'var(--color-condition)',
+  set_var: 'var(--color-setvar)',
+  tool: 'var(--color-tool)',
+  output: 'var(--color-output)'
+};
+
+const NODE_ICONS = {
+  start: '▶',
+  prompt: '✎',
+  llm: '🤖',
+  extractor: '⚲',
+  condition: '⇅',
+  set_var: '⛃',
+  tool: '🛠',
+  output: '■'
+};
+
+const PORT_TEMPLATES = {
+  start: {
+    inputs: [],
+    outputs: [
+      { id: 'flow-out', name: 'Start', type: 'flow' },
+      { id: 'data-out', name: 'Input', type: 'data' }
+    ]
+  },
+  prompt: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'data-in', name: 'Vars', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'prompt-out', name: 'Prompt', type: 'data' }
+    ]
+  },
+  llm: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'prompt-in', name: 'Prompt', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-success', name: 'Success', type: 'flow' },
+      { id: 'flow-error', name: 'Error', type: 'flow' },
+      { id: 'response-out', name: 'Response', type: 'data' }
+    ]
+  },
+  extractor: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'text-in', name: 'Text', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'value-out', name: 'Value', type: 'data' }
+    ]
+  },
+  condition: {
+    inputs: [
+      { id: 'flow-in', name: 'Eval', type: 'flow' },
+      { id: 'text-in', name: 'Text', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-true', name: 'True', type: 'flow' },
+      { id: 'flow-false', name: 'False', type: 'flow' }
+    ]
+  },
+  set_var: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'value-in', name: 'Value', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' }
+    ]
+  },
+  tool: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'input-in', name: 'Input', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'output-out', name: 'Result', type: 'data' }
+    ]
+  },
+  output: {
+    inputs: [
+      { id: 'flow-in', name: 'Done', type: 'flow' },
+      { id: 'text-in', name: 'Result', type: 'data' }
+    ],
+    outputs: []
+  }
+};
+
+// ==========================================================================
+// 3. UI Translations & Helper Modules
 // ==========================================================================
 const TRANSLATIONS = {
   en: {
@@ -122,7 +236,26 @@ const TRANSLATIONS = {
     modal_error_footer: 'Restart your local server with the environment variables above and retry.',
     btn_open_settings: 'Open Settings',
     btn_close: 'Close',
-    clear_canvas: 'Clear Canvas'
+    clear_canvas: 'Clear Canvas',
+    
+    // Node fields translations
+    prop_node_id: 'Node ID',
+    prop_node_title: 'Node Title',
+    prop_start_val: 'Default Input Value',
+    prop_prompt_tmpl: 'Prompt Template',
+    prop_prompt_refine: 'Refine Prompt (LLM)',
+    prop_prompt_revise: 'Revise Prompt with Feedback',
+    prop_prompt_revise_comment: 'Feedback comment...',
+    prop_prompt_revise_btn: 'Revise',
+    prop_llm_temp: 'Temperature',
+    prop_llm_tools: 'Enable Filesystem Tools',
+    prop_extractor_type: 'Extraction Target',
+    prop_extractor_pattern: 'Key / Pattern / Selector',
+    prop_cond_type: 'Condition Rule',
+    prop_cond_val: 'Comparison Value',
+    prop_var_name: 'Target Variable Name',
+    prop_tool_type: 'Mock/Local Tool Type',
+    prop_output_label: 'Output Label'
   },
   ja: {
     status_llm_not_configured: 'LLM: 未設定',
@@ -192,30 +325,38 @@ const TRANSLATIONS = {
     modal_error_footer: '環境変数を設定してローカルサーバーを再起動し、もう一度実行してください。',
     btn_open_settings: '設定を開く',
     btn_close: '閉じる',
-    clear_canvas: 'キャンバスを初期化'
+    clear_canvas: 'キャンバスを初期化',
+    
+    // Node fields translations
+    prop_node_id: 'ノード ID',
+    prop_node_title: 'ノード タイトル',
+    prop_start_val: '初期デフォルト入力値',
+    prop_prompt_tmpl: 'プロンプトテンプレート',
+    prop_prompt_refine: 'プロンプト自動最適化 (LLM)',
+    prop_prompt_revise: '指示・フィードバックによる改修',
+    prop_prompt_revise_comment: '修正の指示を入力...',
+    prop_prompt_revise_btn: '改修する',
+    prop_llm_temp: 'サンプリング温度 (Temperature)',
+    prop_llm_tools: 'ファイルシステムツールを有効化',
+    prop_extractor_type: '抽出ターゲット',
+    prop_extractor_pattern: '抽出キー / 正規表現 / デリミタ',
+    prop_cond_type: '分岐ルール',
+    prop_cond_val: '判定基準値',
+    prop_var_name: '保存先変数名',
+    prop_tool_type: 'ローカル/模擬ツール種類',
+    prop_output_label: '出力表示ラベル'
   }
 };
 
-// ==========================================================================
-// 3. UI Helper Modules (Logs, Badges, Tabs, Themes, Languages)
-// ==========================================================================
-
-/**
- * Apply the selected language translations to the UI
- * @param {string} langCode 'en' | 'ja'
- */
 function applyLanguage(langCode) {
   state.lang = langCode;
   const t = TRANSLATIONS[langCode];
   if (!t) return;
   
-  // Update elements with data-i18n
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
-      // If element has a child (like inline SVGs or badge dots), only update the text node
       if (el.children.length > 0) {
-        // Find text node child or create one
         let textNode = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
         if (textNode) {
           textNode.nodeValue = ' ' + t[key];
@@ -228,81 +369,31 @@ function applyLanguage(langCode) {
     }
   });
 
-  // Update elements with data-i18n-title
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     const key = el.getAttribute('data-i18n-title');
     if (t[key]) el.setAttribute('title', t[key]);
   });
   
-  // Set dropdown value
   const select = document.getElementById('settings-language');
   if (select) select.value = langCode;
   
   log(langCode === 'en' ? 'Language switched to English.' : '言語が日本語に切り替わりました。', 'info');
+  
+  // Re-render properties panel to apply language changes if visible
+  if (state.selectedNodeId) {
+    showNodeProperties(state.selectedNodeId);
+  }
 }
 
-/**
- * Apply the selected color theme class to body
- * @param {string} themeName Class name of the theme
- */
 function applyTheme(themeName) {
   state.theme = themeName;
-  
-  // Remove all themes
   document.body.classList.remove('theme-cyber-dark', 'theme-matrix-green', 'theme-light-slate');
-  
-  // Add selected
   document.body.classList.add(themeName);
   
-  // Set dropdown value
   const select = document.getElementById('settings-theme');
   if (select) select.value = themeName;
   
   log(state.lang === 'en' ? `Color theme switched to ${themeName}.` : `カラーテーマを ${themeName} に切り替えました。`, 'info');
-}
-
-/**
- * Append message to the console logger in the UI
- * @param {string} text Message text
- * @param {string} type 'info' | 'success' | 'warning' | 'error'
- * @param {object} details Optional details object for inspector
- */
-function log(text, type = 'info', details = null) {
-  const timestamp = new Date().toLocaleTimeString();
-  const entry = { timestamp, text, type, details };
-  state.logs.push(entry);
-  
-  const container = document.getElementById('logs-container');
-  if (!container) return;
-  
-  // Clear placeholder text if first log
-  if (state.logs.length === 1) {
-    container.innerHTML = '';
-  }
-  
-  const entryEl = document.createElement('div');
-  entryEl.className = `log-entry ${type}`;
-  
-  const metaEl = document.createElement('div');
-  metaEl.className = 'log-meta';
-  metaEl.innerHTML = `<span>[${type.toUpperCase()}]</span><span>${timestamp}</span>`;
-  
-  const textEl = document.createElement('div');
-  textEl.className = 'log-text';
-  textEl.innerText = text;
-  
-  entryEl.appendChild(metaEl);
-  entryEl.appendChild(textEl);
-  
-  if (details) {
-    const detailsEl = document.createElement('pre');
-    detailsEl.className = 'log-details-block';
-    detailsEl.innerText = typeof details === 'string' ? details : JSON.stringify(details, null, 2);
-    entryEl.appendChild(detailsEl);
-  }
-  
-  container.appendChild(entryEl);
-  container.scrollTop = container.scrollHeight;
 }
 
 /**
@@ -415,20 +506,946 @@ function updateLlmProvider(provider) {
   }
 }
 
+function log(text, type = 'info', details = null) {
+  const timestamp = new Date().toLocaleTimeString();
+  const entry = { timestamp, text, type, details };
+  state.logs.push(entry);
+  
+  const container = document.getElementById('logs-container');
+  if (!container) return;
+  
+  if (state.logs.length === 1) {
+    container.innerHTML = '';
+  }
+  
+  const entryEl = document.createElement('div');
+  entryEl.className = `log-entry ${type}`;
+  
+  const metaEl = document.createElement('div');
+  metaEl.className = 'log-meta';
+  metaEl.innerHTML = `<span>[${type.toUpperCase()}]</span><span>${timestamp}</span>`;
+  
+  const textEl = document.createElement('div');
+  textEl.className = 'log-text';
+  textEl.innerText = text;
+  
+  entryEl.appendChild(metaEl);
+  entryEl.appendChild(textEl);
+  
+  if (details) {
+    const detailsEl = document.createElement('pre');
+    detailsEl.className = 'log-details-block';
+    detailsEl.innerText = typeof details === 'string' ? details : JSON.stringify(details, null, 2);
+    entryEl.appendChild(detailsEl);
+  }
+  
+  container.appendChild(entryEl);
+  container.scrollTop = container.scrollHeight;
+}
+
 // ==========================================================================
-// 4. Initialization & Event Wiring
+// 4. Canvas Panning & Zooming [Phase 2]
+// ==========================================================================
+function updateCanvasTransform() {
+  const canvas = document.getElementById('node-canvas');
+  if (!canvas) return;
+  canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+}
+
+function initCanvasControls() {
+  const viewport = document.getElementById('canvas-viewport');
+  
+  // Panning Event Listeners
+  viewport.addEventListener('mousedown', (e) => {
+    // Start panning if clicking directly on canvas/viewport (or SVG overlay) or using space/middle-click/right-click
+    const isBgClick = e.target === viewport || e.target.id === 'node-canvas' || e.target.id === 'connections-overlay';
+    const isPanTrigger = isBgClick || e.button === 1 || e.button === 2 || e.spaceKey;
+    
+    if (isPanTrigger) {
+      state.isPanning = true;
+      viewport.style.cursor = 'grabbing';
+      state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (state.isPanning) {
+      state.pan.x = e.clientX - state.panStart.x;
+      state.pan.y = e.clientY - state.panStart.y;
+      updateCanvasTransform();
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (state.isPanning) {
+      state.isPanning = false;
+      viewport.style.cursor = 'grab';
+    }
+  });
+
+  // Prevent browser context menu on canvas right-click so it can be used for panning
+  viewport.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+
+  // Zooming Event (Mouse Wheel)
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = 1.08;
+    const rect = viewport.getBoundingClientRect();
+    
+    // Mouse coords relative to viewport
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Mouse coords relative to unscaled canvas
+    const canvasX = (mouseX - state.pan.x) / state.zoom;
+    const canvasY = (mouseY - state.pan.y) / state.zoom;
+    
+    const nextZoom = e.deltaY < 0 ? state.zoom * zoomFactor : state.zoom / zoomFactor;
+    state.zoom = Math.min(2.0, Math.max(0.25, nextZoom));
+    
+    // Recalculate pan so zooming centers on mouse cursor
+    state.pan.x = mouseX - canvasX * state.zoom;
+    state.pan.y = mouseY - canvasY * state.zoom;
+    
+    updateCanvasTransform();
+  });
+
+  // Canvas Control Buttons
+  document.getElementById('zoom-in-btn').addEventListener('click', () => {
+    state.zoom = Math.min(2.0, state.zoom * 1.25);
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('zoom-out-btn').addEventListener('click', () => {
+    state.zoom = Math.max(0.25, state.zoom / 1.25);
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('zoom-reset-btn').addEventListener('click', () => {
+    state.zoom = 1.0;
+    state.pan = { x: 0, y: 0 };
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('clear-canvas-btn').addEventListener('click', () => {
+    state.nodes = [];
+    state.links = [];
+    state.selectedNodeId = null;
+    document.getElementById('nodes-container').innerHTML = '';
+    drawConnections();
+    document.getElementById('node-properties-section').classList.add('collapsed');
+    log(state.lang === 'en' ? 'Canvas cleared.' : 'キャンバスを初期化しました。', 'warning');
+  });
+}
+
+// ==========================================================================
+// 5. Node Mechanics (Create, Drag, Delete, Select) [Phase 2]
+// ==========================================================================
+
+/**
+ * Generate HTML representation of a node and add it to canvas
+ * @param {object} node Node data definition
+ */
+function renderNode(node) {
+  const container = document.getElementById('nodes-container');
+  if (!container) return;
+
+  const card = document.createElement('div');
+  card.className = `node-card ${state.selectedNodeId === node.id ? 'selected' : ''}`;
+  card.id = node.id;
+  card.style.left = `${node.x}px`;
+  card.style.top = `${node.y}px`;
+  
+  const template = PORT_TEMPLATES[node.type];
+
+  // Compose Node UI Card markup
+  let html = `
+    <div class="node-header" style="background-color: ${NODE_COLORS[node.type]}">
+      <div class="node-title">
+        <span class="node-header-icon">${NODE_ICONS[node.type]}</span>
+        <span>${node.title}</span>
+      </div>
+      <button class="node-delete-btn" title="Delete Node">&times;</button>
+    </div>
+    <div class="node-body">
+  `;
+
+  // Custom visual previews inside node card based on type
+  if (node.type === NODE_TYPES.START) {
+    html += `<div class="node-field-group"><label data-i18n="prop_start_val">Input Value</label><input type="text" class="node-input-text inline-edit" data-prop="inputValue" value="${node.data.inputValue || ''}" placeholder="Initial input text..."></div>`;
+  } else if (node.type === NODE_TYPES.PROMPT) {
+    const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+    html += `<div class="node-field-group"><label data-i18n="prop_prompt_tmpl">Prompt Template</label><div style="font-family: var(--font-mono); font-size:10px; color:var(--text-muted); min-height:16px;">${displayVal || '<i>Empty Template</i>'}</div></div>`;
+  } else if (node.type === NODE_TYPES.LLM) {
+    html += `<div class="node-field-group"><label data-i18n="prop_llm_temp">Temperature</label><div>${node.data.temperature !== undefined ? node.data.temperature : 0.7}</div></div>`;
+  } else if (node.type === NODE_TYPES.SET_VAR) {
+    html += `<div class="node-field-group"><label data-i18n="prop_var_name">Var Name</label><input type="text" class="node-input-text inline-edit" data-prop="variableName" value="${node.data.variableName || ''}" placeholder="e.g. current_code"></div>`;
+  } else if (node.type === NODE_TYPES.EXTRACTOR) {
+    html += `<div class="node-field-group"><label data-i18n="prop_extractor_type">Target</label><div>${node.data.extractorType || 'code_block'}</div></div>`;
+  } else if (node.type === NODE_TYPES.CONDITION) {
+    html += `<div class="node-field-group"><label data-i18n="prop_cond_type">Rule</label><div>${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"</div></div>`;
+  } else if (node.type === NODE_TYPES.TOOL) {
+    html += `<div class="node-field-group"><label data-i18n="prop_tool_type">Tool</label><div>${node.data.toolType || 'mock_test'}</div></div>`;
+  } else if (node.type === NODE_TYPES.OUTPUT) {
+    html += `<div class="node-field-group"><label data-i18n="prop_output_label">Label</label><input type="text" class="node-input-text inline-edit" data-prop="outputLabel" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Final Result"></div>`;
+  }
+
+  html += `</div>`; // End of body
+
+  // Render ports
+  html += `<div class="node-ports-wrapper">`;
+  
+  // Left Column: Inputs
+  html += `<div class="ports-column inputs">`;
+  template.inputs.forEach(port => {
+    html += `
+      <div class="port-item ${port.type}-color" data-port-id="${port.id}">
+        <div class="port-dot ${port.type}-port" data-port-id="${port.id}" data-port-type="${port.type}" data-is-input="true" style="color: ${port.type === 'flow' ? 'var(--primary)' : 'var(--accent-purple)'}"></div>
+        <span>${port.name}</span>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  
+  // Right Column: Outputs
+  html += `<div class="ports-column outputs">`;
+  template.outputs.forEach(port => {
+    html += `
+      <div class="port-item ${port.type}-color" data-port-id="${port.id}">
+        <span>${port.name}</span>
+        <div class="port-dot ${port.type}-port" data-port-id="${port.id}" data-port-type="${port.type}" data-is-input="false" style="color: ${port.type === 'flow' ? 'var(--primary)' : 'var(--accent-purple)'}"></div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+
+  html += `</div>`; // End of ports wrapper
+
+  card.innerHTML = html;
+  container.appendChild(card);
+
+  // Apply localization to node card content
+  applyLanguageToNodeCard(card);
+
+  // Setup Event Listeners for dragging, deleting, selecting
+  setupNodeEvents(card, node);
+}
+
+/**
+ * Update node title and labels inside the card on language switch
+ */
+function applyLanguageToNodeCard(cardEl) {
+  const t = TRANSLATIONS[state.lang];
+  if (!t) return;
+  cardEl.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) el.innerText = t[key];
+  });
+}
+
+/**
+ * Bind pointer and mouse events to rendered Node Card
+ */
+function setupNodeEvents(cardEl, node) {
+  const header = cardEl.querySelector('.node-header');
+  
+  // Selection
+  cardEl.addEventListener('click', (e) => {
+    // Avoid double trigger if clicking delete button
+    if (e.target.classList.contains('node-delete-btn')) return;
+    
+    selectNode(node.id);
+    e.stopPropagation(); // Prevent canvas background click deselecting
+  });
+  
+  // Dragging Logic
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('node-delete-btn')) return;
+    
+    state.activeDraggingNodeId = node.id;
+    selectNode(node.id);
+    
+    // Start offset calculations
+    state.dragOffset = {
+      x: e.clientX - node.x * state.zoom,
+      y: e.clientY - node.y * state.zoom
+    };
+    
+    header.style.cursor = 'grabbing';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  // Inline Inputs updates
+  cardEl.querySelectorAll('.inline-edit').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const propName = e.target.getAttribute('data-prop');
+      node.data[propName] = e.target.value;
+      if (state.selectedNodeId === node.id) {
+        showNodeProperties(node.id); // Sync right side inspector
+      }
+    });
+    
+    // Prevent dragging node when typing inside inputs
+    input.addEventListener('mousedown', (e) => e.stopPropagation());
+  });
+
+  // Delete Node button click
+  cardEl.querySelector('.node-delete-btn').addEventListener('click', (e) => {
+    deleteNode(node.id);
+    e.stopPropagation();
+  });
+
+  // Wire up port mouse events for connector lines dragging
+  cardEl.querySelectorAll('.port-dot').forEach(dot => {
+    dot.addEventListener('mousedown', (e) => {
+      const portId = dot.getAttribute('data-port-id');
+      const portType = dot.getAttribute('data-port-type');
+      const isInput = dot.getAttribute('data-is-input') === 'true';
+      
+      const portCoords = getPortCenter(node.id, portId);
+      
+      state.activeLinkDrag = {
+        fromNodeId: node.id,
+        fromPortId: portId,
+        type: portType,
+        startX: portCoords.x,
+        startY: portCoords.y,
+        isInput: isInput
+      };
+      
+      // Show temporary svg link dashed line
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) {
+        tempPath.style.display = 'block';
+        tempPath.setAttribute('stroke', portType === 'flow' ? 'var(--primary)' : 'var(--accent-purple)');
+        tempPath.setAttribute('d', `M ${portCoords.x} ${portCoords.y} L ${portCoords.x} ${portCoords.y}`);
+      }
+      
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+}
+
+/**
+ * Handle document pointermove and pointerup globally for node dragging and link connection
+ */
+function initGlobalDragAndDrop() {
+  document.addEventListener('mousemove', (e) => {
+    // 1. Handle Active Node Dragging
+    if (state.activeDraggingNodeId) {
+      const node = state.nodes.find(n => n.id === state.activeDraggingNodeId);
+      if (node) {
+        // Calculate new X,Y corrected by the viewport zoom scale!
+        node.x = (e.clientX - state.dragOffset.x) / state.zoom;
+        node.y = (e.clientY - state.dragOffset.y) / state.zoom;
+        
+        const card = document.getElementById(node.id);
+        if (card) {
+          card.style.left = `${node.x}px`;
+          card.style.top = `${node.y}px`;
+        }
+        
+        // Redraw SVG link wires
+        drawConnections();
+      }
+    }
+    
+    // 2. Handle Port Link Connection Dragging
+    if (state.activeLinkDrag) {
+      const canvas = document.getElementById('node-canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // Calculate cursor relative to unscaled canvas
+      const mouseX = (e.clientX - canvasRect.left) / state.zoom;
+      const mouseY = (e.clientY - canvasRect.top) / state.zoom;
+      
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) {
+        // Beautify current temporary path drawing
+        const x1 = state.activeLinkDrag.startX;
+        const y1 = state.activeLinkDrag.startY;
+        const x2 = mouseX;
+        const y2 = mouseY;
+        
+        // Curved line dynamically bent based on direction
+        const dx = Math.abs(x2 - x1);
+        const offset = Math.max(50, dx * 0.4);
+        const ctrlX1 = state.activeLinkDrag.isInput ? x1 - offset : x1 + offset;
+        const ctrlX2 = state.activeLinkDrag.isInput ? x2 + offset : x2 - offset;
+        
+        tempPath.setAttribute('d', `M ${x1} ${y1} C ${ctrlX1} ${y1}, ${ctrlX2} ${y2}, ${x2} ${y2}`);
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    // 1. Release Node Dragging
+    if (state.activeDraggingNodeId) {
+      const card = document.getElementById(state.activeDraggingNodeId);
+      if (card) {
+        card.querySelector('.node-header').style.cursor = 'move';
+      }
+      state.activeDraggingNodeId = null;
+    }
+    
+    // 2. Release Link Dragging (Establish Connection)
+    if (state.activeLinkDrag) {
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) tempPath.style.display = 'none';
+      
+      // Check if released mouse cursor over an opposite port-dot
+      const targetDot = document.elementFromPoint(e.clientX, e.clientY);
+      const isPortDot = targetDot && targetDot.classList.contains('port-dot');
+      
+      if (isPortDot) {
+        const targetPortId = targetDot.getAttribute('data-port-id');
+        const targetPortType = targetDot.getAttribute('data-port-type');
+        const targetIsInput = targetDot.getAttribute('data-is-input') === 'true';
+        
+        // Find parent Node Card ID
+        const targetCard = targetDot.closest('.node-card');
+        const targetNodeId = targetCard ? targetCard.id : null;
+        
+        const sourceNodeId = state.activeLinkDrag.fromNodeId;
+        const sourcePortId = state.activeLinkDrag.fromPortId;
+        const sourceIsInput = state.activeLinkDrag.isInput;
+        const sourceType = state.activeLinkDrag.type;
+        
+        // Validation constraints:
+        // - Different nodes
+        // - Connect flow to flow, data to data only
+        // - Input connects to output or vice-versa
+        const isValidLink = targetNodeId && 
+                            targetNodeId !== sourceNodeId &&
+                            targetPortType === sourceType &&
+                            targetIsInput !== sourceIsInput;
+                            
+        if (isValidLink) {
+          // Identify source and destination port correctly
+          const fromNode = sourceIsInput ? targetNodeId : sourceNodeId;
+          const fromPort = sourceIsInput ? targetPortId : sourcePortId;
+          const toNode = sourceIsInput ? sourceNodeId : targetNodeId;
+          const toPort = sourceIsInput ? sourcePortId : targetPortId;
+          
+          // Prevent duplicates
+          const exists = state.links.some(l => 
+            l.fromNode === fromNode && l.fromPort === fromPort &&
+            l.toNode === toNode && l.toPort === toPort
+          );
+          
+          if (!exists) {
+            // Remove previous connections connected to Flow Input port (Flow inputs usually accept only 1 incoming connection!)
+            // Data inputs can also accept only 1 incoming connection.
+            // Let's delete any existing links targeting (toPort) on (toNode)
+            state.links = state.links.filter(l => !(l.toNode === toNode && l.toPort === toPort));
+            
+            const newLink = {
+              id: `link_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+              fromNode,
+              fromPort,
+              toNode,
+              toPort,
+              type: sourceType
+            };
+            
+            state.links.push(newLink);
+            log(state.lang === 'en' ? `Connected port ${fromPort} ➔ ${toPort}.` : `ポート接続を確立しました: ${fromPort} ➔ ${toPort}`, 'success');
+            drawConnections();
+          }
+        }
+      }
+      state.activeLinkDrag = null;
+    }
+  });
+
+  // Double click canvas to deselect nodes
+  document.getElementById('canvas-viewport').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('canvas-viewport') || 
+        e.target.id === 'node-canvas' || 
+        e.target.id === 'connections-overlay') {
+      deselectNodes();
+    }
+  });
+}
+
+/**
+ * Select a specific Node and highlight it
+ * @param {string} nodeId Target Node ID
+ */
+function selectNode(nodeId) {
+  state.selectedNodeId = nodeId;
+  document.querySelectorAll('.node-card').forEach(card => {
+    if (card.id === nodeId) {
+      card.classList.add('selected');
+    } else {
+      card.classList.remove('selected');
+    }
+  });
+  
+  // Show properties panel
+  showNodeProperties(nodeId);
+}
+
+/**
+ * Clear Node selections
+ */
+function deselectNodes() {
+  state.selectedNodeId = null;
+  document.querySelectorAll('.node-card').forEach(card => card.classList.remove('selected'));
+  
+  // Collapse property sidebar
+  const propSection = document.getElementById('node-properties-section');
+  if (propSection) propSection.classList.add('collapsed');
+}
+
+/**
+ * Add a node to the canvas based on selected type
+ * @param {string} type Node type
+ * @param {number} x Canvas relative X coordinate
+ * @param {number} y Canvas relative Y coordinate
+ */
+function createNode(type, x, y) {
+  const nodeId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const template = PORT_TEMPLATES[type];
+  
+  const defaultTitle = TRANSLATIONS[state.lang][`node_${type}`] || type;
+  
+  const newNode = {
+    id: nodeId,
+    type: type,
+    title: defaultTitle,
+    x: x,
+    y: y,
+    data: {
+      promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
+      systemPrompt: type === NODE_TYPES.LLM ? 'You are a professional software engineer.' : '',
+      temperature: 0.7,
+      conditionType: 'contains',
+      conditionValue: 'PASS',
+      variableName: type === NODE_TYPES.SET_VAR ? 'current_code' : '',
+      toolType: 'mock_test',
+      outputLabel: type === NODE_TYPES.OUTPUT ? 'Verification Report' : '',
+      inputValue: type === NODE_TYPES.START ? 'Initial source code here' : '',
+      extractorType: 'code_block',
+      extractorPattern: ''
+    }
+  };
+  
+  state.nodes.push(newNode);
+  renderNode(newNode);
+  selectNode(nodeId);
+  drawConnections();
+  
+  log(state.lang === 'en' ? `Added ${type} node.` : `${defaultTitle}ノードを作成しました。`, 'info');
+  return newNode;
+}
+
+/**
+ * Remove node and all connected link wires from canvas
+ * @param {string} nodeId Target Node ID
+ */
+function deleteNode(nodeId) {
+  state.nodes = state.nodes.filter(n => n.id !== nodeId);
+  
+  // Remove links connected to this node
+  state.links = state.links.filter(l => l.fromNode !== nodeId && l.toNode !== nodeId);
+  
+  const el = document.getElementById(nodeId);
+  if (el) el.remove();
+  
+  if (state.selectedNodeId === nodeId) {
+    deselectNodes();
+  }
+  
+  drawConnections();
+  log(state.lang === 'en' ? `Deleted node ${nodeId}.` : `ノードを削除しました。`, 'warning');
+}
+
+// ==========================================================================
+// 6. SVG Connection Lines Drawer [Phase 2]
+// ==========================================================================
+
+/**
+ * Retrieve absolute coordinates of a port dot center relative to unscaled canvas
+ */
+function getPortCenter(nodeId, portId) {
+  const nodeEl = document.getElementById(nodeId);
+  if (!nodeEl) return { x: 0, y: 0 };
+  
+  const portEl = nodeEl.querySelector(`[data-port-id="${portId}"]`);
+  if (!portEl) return { x: 0, y: 0 };
+  
+  const canvasEl = document.getElementById('node-canvas');
+  const portRect = portEl.getBoundingClientRect();
+  const canvasRect = canvasEl.getBoundingClientRect();
+  
+  // Remove viewport transform zoom factor to get exact pixel coordinate representation
+  return {
+    x: (portRect.left + portRect.width / 2 - canvasRect.left) / state.zoom,
+    y: (portRect.top + portRect.height / 2 - canvasRect.top) / state.zoom
+  };
+}
+
+/**
+ * Render all lines in SVG connections overlay
+ */
+function drawConnections() {
+  const linksGroup = document.getElementById('links-group');
+  if (!linksGroup) return;
+  
+  linksGroup.innerHTML = '';
+  
+  state.links.forEach(link => {
+    const start = getPortCenter(link.fromNode, link.fromPort);
+    const end = getPortCenter(link.toNode, link.toPort);
+    
+    // Draw smooth cubic bezier
+    const dx = Math.abs(end.x - start.x);
+    const offset = Math.max(80, dx * 0.4); // Bending offset
+    
+    const x1 = start.x;
+    const y1 = start.y;
+    const x2 = end.x;
+    const y2 = end.y;
+    
+    const d = `M ${x1} ${y1} C ${x1 + offset} ${y1}, ${x2 - offset} ${y2}, ${x2} ${y2}`;
+    
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('data-link-id', link.id);
+    path.className.baseVal = `${link.type}-connection`;
+    
+    // Highlight if active step running (pulse signal animation class)
+    if (state.currentNodeId === link.fromNode && state.runnerState === 'running') {
+      path.className.baseVal += ' active-signal';
+    }
+    
+    // Delete link on double click
+    path.addEventListener('dblclick', () => {
+      deleteLink(link.id);
+    });
+    
+    // Give cursor indication
+    path.addEventListener('mouseover', () => {
+      path.setAttribute('stroke-width', '4');
+    });
+    path.addEventListener('mouseout', () => {
+      path.setAttribute('stroke-width', '2.5');
+    });
+    
+    linksGroup.appendChild(path);
+  });
+}
+
+function deleteLink(linkId) {
+  state.links = state.links.filter(l => l.id !== linkId);
+  drawConnections();
+  log(state.lang === 'en' ? 'Link removed.' : '接続線を削除しました。', 'warning');
+}
+
+// ==========================================================================
+// 7. Right Properties Inspector Panel [Phase 2]
+// ==========================================================================
+
+/**
+ * Display selected node parameters in the inspector sidebar panel
+ * @param {string} nodeId Node ID
+ */
+function showNodeProperties(nodeId) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  const container = document.getElementById('properties-content');
+  const section = document.getElementById('node-properties-section');
+  
+  if (!node || !container || !section) return;
+  
+  section.classList.remove('collapsed');
+  container.innerHTML = '';
+  
+  const t = TRANSLATIONS[state.lang];
+
+  let html = `
+    <!-- Common Node Fields -->
+    <div class="form-group">
+      <label>${t.prop_node_id}</label>
+      <input type="text" class="node-input-text" value="${node.id}" readonly style="opacity: 0.6; font-family: var(--font-mono); font-size:10px;">
+    </div>
+    <div class="form-group">
+      <label>${t.prop_node_title}</label>
+      <input type="text" id="prop-title-input" class="node-input-text" value="${node.title}">
+    </div>
+    <div class="border-top" style="margin-top: 8px; padding-top: 8px;"></div>
+  `;
+
+  // Custom properties based on Node Type
+  if (node.type === NODE_TYPES.START) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_start_val}</label>
+        <textarea id="prop-start-input" class="node-input-text node-textarea" placeholder="Input string...">${node.data.inputValue || ''}</textarea>
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.PROMPT) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_prompt_tmpl}</label>
+        <textarea id="prop-prompt-input" class="node-input-text node-textarea" style="min-height: 120px;" placeholder="Prompt text templates...">${node.data.promptTemplate || ''}</textarea>
+      </div>
+      <!-- Prompt Refiners Skeletons -->
+      <div class="prompt-engineer-row">
+        <button id="prompt-refine-btn" class="btn btn-secondary btn-xs" style="flex-grow:1;" title="${t.prop_prompt_refine}">${t.prop_prompt_refine}</button>
+      </div>
+      <div class="form-group" style="margin-top: 8px;">
+        <label>${t.prop_prompt_revise}</label>
+        <div style="display:flex; gap:4px;">
+          <input type="text" id="prompt-revise-comment" class="node-input-text" placeholder="${t.prop_prompt_revise_comment}">
+          <button id="prompt-revise-btn" class="btn btn-secondary btn-sm">${t.prop_prompt_revise_btn}</button>
+        </div>
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.LLM) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_llm_temp} (${node.data.temperature !== undefined ? node.data.temperature : 0.7})</label>
+        <input type="range" id="prop-llm-temp" min="0.0" max="1.0" step="0.1" value="${node.data.temperature !== undefined ? node.data.temperature : 0.7}">
+      </div>
+      <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px;">
+        <label for="prop-llm-tools">${t.prop_llm_tools}</label>
+        <input type="checkbox" id="prop-llm-tools" ${node.data.enableTools ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.EXTRACTOR) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_extractor_type}</label>
+        <select id="prop-extractor-type">
+          <option value="code_block" ${node.data.extractorType === 'code_block' ? 'selected' : ''}>Markdown Code Block</option>
+          <option value="json" ${node.data.extractorType === 'json' ? 'selected' : ''}>JSON Key Extraction</option>
+          <option value="regex" ${node.data.extractorType === 'regex' ? 'selected' : ''}>Regex Group Match</option>
+          <option value="delimiter" ${node.data.extractorType === 'delimiter' ? 'selected' : ''}>Start/End Delimiter</option>
+        </select>
+      </div>
+      <div class="form-group" id="prop-extractor-pattern-group" style="${node.data.extractorType === 'code_block' ? 'display:none;' : ''}">
+        <label>${t.prop_extractor_pattern}</label>
+        <input type="text" id="prop-extractor-pattern" class="node-input-text" value="${node.data.extractorPattern || ''}" placeholder="e.g. verdict, (PASS|FAIL)">
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.CONDITION) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_cond_type}</label>
+        <select id="prop-cond-type">
+          <option value="contains" ${node.data.conditionType === 'contains' ? 'selected' : ''}>Text Contains</option>
+          <option value="not_contains" ${node.data.conditionType === 'not_contains' ? 'selected' : ''}>Text Does Not Contain</option>
+          <option value="regex" ${node.data.conditionType === 'regex' ? 'selected' : ''}>Regex Match</option>
+          <option value="js" ${node.data.conditionType === 'js' ? 'selected' : ''}>Custom JS Expression</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>${t.prop_cond_val}</label>
+        <input type="text" id="prop-cond-val" class="node-input-text" value="${node.data.conditionValue || ''}" placeholder="e.g. PASS, code !== ''">
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.SET_VAR) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_var_name}</label>
+        <input type="text" id="prop-var-input" class="node-input-text" value="${node.data.variableName || ''}" placeholder="e.g. current_code">
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.TOOL) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_tool_type}</label>
+        <select id="prop-tool-type">
+          <option value="mock_test" ${node.data.toolType === 'mock_test' ? 'selected' : ''}>Mock Code Compiler/Tester</option>
+          <option value="mock_search" ${node.data.toolType === 'mock_search' ? 'selected' : ''}>Mock Web Search</option>
+          <option value="js_sandbox" ${node.data.toolType === 'js_sandbox' ? 'selected' : ''}>Real Custom JS Sandbox</option>
+        </select>
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.OUTPUT) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_output_label}</label>
+        <input type="text" id="prop-output-input" class="node-input-text" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Verification Report">
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+  
+  // Wire up property change events
+  wirePropertyControls(node);
+}
+
+/**
+ * Listen to input modifications inside the Property Inspector Form
+ * @param {object} node Target Node data
+ */
+function wirePropertyControls(node) {
+  // Title modify
+  const titleInput = document.getElementById('prop-title-input');
+  if (titleInput) {
+    titleInput.addEventListener('input', (e) => {
+      node.title = e.target.value;
+      const cardTitleSpan = document.getElementById(node.id).querySelector('.node-title span:last-child');
+      if (cardTitleSpan) cardTitleSpan.innerText = node.title;
+    });
+  }
+
+  // Start Node input value modify
+  const startInput = document.getElementById('prop-start-input');
+  if (startInput) {
+    startInput.addEventListener('input', (e) => {
+      node.data.inputValue = e.target.value;
+      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="inputValue"]');
+      if (inlineInput) inlineInput.value = node.data.inputValue;
+    });
+  }
+
+  // Prompt template text modify
+  const promptInput = document.getElementById('prop-prompt-input');
+  if (promptInput) {
+    promptInput.addEventListener('input', (e) => {
+      node.data.promptTemplate = e.target.value;
+      
+      // Update inline label text snippet inside node card
+      const textDiv = document.getElementById(node.id).querySelector('.node-body div div');
+      if (textDiv) {
+        textDiv.innerText = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : 'Empty Template';
+      }
+    });
+    
+    // Wire up prompt engineering buttons (Skeletons for Phase 4)
+    document.getElementById('prompt-refine-btn').addEventListener('click', () => {
+      log('Prompt optimization request triggered. Refinement logic will execute in Phase 4.', 'info');
+    });
+    
+    document.getElementById('prompt-revise-btn').addEventListener('click', () => {
+      const commentInput = document.getElementById('prompt-revise-comment');
+      log(`Prompt revision requested with comment: "${commentInput.value}". Revision logic will execute in Phase 4.`, 'info');
+    });
+  }
+
+  // LLM Call Temperature / Checkbox tools
+  const tempRange = document.getElementById('prop-llm-temp');
+  if (tempRange) {
+    tempRange.addEventListener('input', (e) => {
+      node.data.temperature = parseFloat(e.target.value);
+      // Update label in properties panel
+      tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${node.data.temperature})`;
+      // Update card preview
+      const tempDiv = document.getElementById(node.id).querySelector('.node-body div div');
+      if (tempDiv) tempDiv.innerText = node.data.temperature;
+    });
+  }
+  
+  const toolsCheck = document.getElementById('prop-llm-tools');
+  if (toolsCheck) {
+    toolsCheck.addEventListener('change', (e) => {
+      node.data.enableTools = e.target.checked;
+    });
+  }
+
+  // Extractor selections
+  const extractSelect = document.getElementById('prop-extractor-type');
+  if (extractSelect) {
+    extractSelect.addEventListener('change', (e) => {
+      node.data.extractorType = e.target.value;
+      const patternGroup = document.getElementById('prop-extractor-pattern-group');
+      if (patternGroup) {
+        patternGroup.style.display = node.data.extractorType === 'code_block' ? 'none' : 'block';
+      }
+      
+      const cardTypeDiv = document.getElementById(node.id).querySelector('.node-body div div');
+      if (cardTypeDiv) cardTypeDiv.innerText = node.data.extractorType;
+    });
+  }
+  
+  const extractPattern = document.getElementById('prop-extractor-pattern');
+  if (extractPattern) {
+    extractPattern.addEventListener('input', (e) => {
+      node.data.extractorPattern = e.target.value;
+    });
+  }
+
+  // Condition rules selection
+  const condSelect = document.getElementById('prop-cond-type');
+  if (condSelect) {
+    condSelect.addEventListener('change', (e) => {
+      node.data.conditionType = e.target.value;
+      updateConditionPreview(node);
+    });
+  }
+  
+  const condVal = document.getElementById('prop-cond-val');
+  if (condVal) {
+    condVal.addEventListener('input', (e) => {
+      node.data.conditionValue = e.target.value;
+      updateConditionPreview(node);
+    });
+  }
+
+  // Set Var name input
+  const varInput = document.getElementById('prop-var-input');
+  if (varInput) {
+    varInput.addEventListener('input', (e) => {
+      node.data.variableName = e.target.value;
+      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="variableName"]');
+      if (inlineInput) inlineInput.value = node.data.variableName;
+    });
+  }
+
+  // Tool type select
+  const toolSelect = document.getElementById('prop-tool-type');
+  if (toolSelect) {
+    toolSelect.addEventListener('change', (e) => {
+      node.data.toolType = e.target.value;
+      const cardToolDiv = document.getElementById(node.id).querySelector('.node-body div div');
+      if (cardToolDiv) cardToolDiv.innerText = node.data.toolType;
+    });
+  }
+
+  // Output label input
+  const outputInput = document.getElementById('prop-output-input');
+  if (outputInput) {
+    outputInput.addEventListener('input', (e) => {
+      node.data.outputLabel = e.target.value;
+      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="outputLabel"]');
+      if (inlineInput) inlineInput.value = node.data.outputLabel;
+    });
+  }
+}
+
+function updateConditionPreview(node) {
+  const cardDiv = document.getElementById(node.id).querySelector('.node-body div div');
+  if (cardDiv) {
+    cardDiv.innerText = `${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"`;
+  }
+}
+
+// ==========================================================================
+// 8. Event wiring and initial presets creation [Phase 2]
 // ==========================================================================
 function initEvents() {
-  // Language Change Listener [NEW]
+  // Sidebar tabs nav
+  initTabs();
+  
+  // Language switcher
   const langSelect = document.getElementById('settings-language');
   if (langSelect) {
     langSelect.addEventListener('change', (e) => {
       applyLanguage(e.target.value);
-      checkChromeAi(); // Re-run AI check to update localized descriptions
+      checkChromeAi();
     });
   }
 
-  // Theme Change Listener [NEW]
+  // Theme switcher
   const themeSelect = document.getElementById('settings-theme');
   if (themeSelect) {
     themeSelect.addEventListener('change', (e) => {
@@ -436,7 +1453,7 @@ function initEvents() {
     });
   }
 
-  // LLM Provider select change
+  // LLM Provider select
   const providerSelect = document.getElementById('settings-provider');
   if (providerSelect) {
     providerSelect.addEventListener('change', (e) => {
@@ -444,7 +1461,7 @@ function initEvents() {
     });
   }
   
-  // API settings inputs change
+  // API config inputs
   ['settings-api-url', 'settings-api-model', 'settings-api-key'].forEach(id => {
     const input = document.getElementById(id);
     if (input) {
@@ -456,7 +1473,7 @@ function initEvents() {
     }
   });
 
-  // Modal closers
+  // Modal actions
   const closeErrorBtn = document.getElementById('close-error-modal-btn');
   const modalCloseBtn = document.getElementById('modal-close-btn');
   const errorModal = document.getElementById('error-modal');
@@ -476,17 +1493,46 @@ function initEvents() {
       if (settingsTabBtn) settingsTabBtn.click();
     });
   }
+  
+  // Properties panel close
+  const closePropsBtn = document.getElementById('close-properties-btn');
+  if (closePropsBtn) {
+    closePropsBtn.addEventListener('click', () => {
+      deselectNodes();
+    });
+  }
+
+  // Palette Click to Create Node
+  document.querySelectorAll('.palette-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.getAttribute('data-node-type');
+      
+      // Calculate coordinates to spawn node at the center of the current canvas viewport
+      const viewport = document.getElementById('canvas-viewport');
+      const centerX = -state.pan.x + (viewport.clientWidth / 2 - 140) / state.zoom;
+      const centerY = -state.pan.y + (viewport.clientHeight / 2 - 80) / state.zoom;
+      
+      createNode(type, centerX, centerY);
+    });
+  });
 }
 
-// DomContentLoaded Setup
+// DomContentLoaded Initialization entrypoint
 document.addEventListener('DOMContentLoaded', () => {
   // Set default theme and language
   applyTheme(state.theme);
   applyLanguage(state.lang);
   
   log('Initializing Fabre v0.1.0 workspace...', 'info');
-  initTabs();
+  initCanvasControls();
+  initGlobalDragAndDrop();
   initEvents();
   checkChromeAi();
+  
+  // Spawn basic Start & Output nodes as template placeholders
+  createNode(NODE_TYPES.START, 100, 200);
+  createNode(NODE_TYPES.OUTPUT, 600, 200);
+  deselectNodes();
+  
   log('Workspace initialized. Ready to build agents.', 'success');
 });
