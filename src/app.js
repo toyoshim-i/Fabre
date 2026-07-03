@@ -1901,6 +1901,7 @@ function showNodeProperties(nodeId) {
  * @returns {Promise<string>} Content response from LLM
  */
 async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null) {
+  let responseContent = '';
   if (state.llmProvider === 'chrome-ai') {
     const aiModel = window.ai && (window.ai.languageModel || window.ai.assistant);
     if (!state.chromeAiAvailable || !window.ai || !aiModel) {
@@ -1908,6 +1909,22 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
         ? 'Chrome Built-in AI is not available. Please verify capability flags or select External API.'
         : 'Chrome 組み込み AI が利用できません。フラグが有効化されているか確認するか、外部APIを選択してください。');
     }
+
+    log(
+      state.lang === 'en'
+        ? `Sending query via Chrome Built-in AI...`
+        : `Chrome 組み込み AI 経由でクエリを送信中...`,
+      'info',
+      `[API Engine] Chrome Built-in AI (window.ai)
+[System Prompt]
+${systemPrompt}
+
+[User Prompt]
+${userPrompt}
+
+[Temperature]
+${temperature}`
+    );
     
     // Create new session with system prompt instructions
     const session = await aiModel.create({
@@ -1917,8 +1934,7 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
     });
     
     try {
-      const result = await session.prompt(userPrompt, { signal });
-      return result;
+      responseContent = await session.prompt(userPrompt, { signal });
     } finally {
       session.destroy(); // Always cleanup sessions
     }
@@ -1955,10 +1971,6 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
       }
     }
     
-    log(state.lang === 'en' 
-      ? `Sending query using model: ${selectedModel}` 
-      : `使用モデル: ${selectedModel} でクエリを送信中...`, 'info');
-
     const body = {
       model: selectedModel,
       messages: [
@@ -1967,6 +1979,24 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
       ],
       temperature: temperature
     };
+
+    const loggedHeaders = { ...headers };
+    if (loggedHeaders['Authorization']) {
+      loggedHeaders['Authorization'] = 'Bearer ******'; // Mask API Key
+    }
+
+    log(
+      state.lang === 'en'
+        ? `Sending query to External API via endpoint: ${endpoint}`
+        : `外部APIエンドポイント: ${endpoint} へクエリを送信中...`,
+      'info',
+      `[POST Endpoint] ${endpoint}/chat/completions
+[Headers]
+${JSON.stringify(loggedHeaders, null, 2)}
+
+[Request Body]
+${JSON.stringify(body, null, 2)}`
+    );
     
     const response = await fetch(`${endpoint}/chat/completions`, {
       method: 'POST',
@@ -1988,7 +2018,7 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
         }
       } catch (jsonErr) {
         try {
-          errorMsg = await response.text();
+          errorMsg = await response.clone().text();
         } catch (txtErr) {
           errorMsg = 'Unknown server error';
         }
@@ -2002,8 +2032,15 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
     if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
       throw new Error('API returned an empty or invalid chat completion payload.');
     }
-    return data.choices[0].message.content;
+    responseContent = data.choices[0].message.content;
   }
+
+  log(
+    state.lang === 'en' ? 'LLM response received successfully.' : 'LLMからの応答を受信しました。',
+    'success',
+    `[Response Content]\n${responseContent}`
+  );
+  return responseContent;
 }
 
 /**
