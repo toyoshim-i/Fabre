@@ -28,6 +28,9 @@ const state = {
   activeDraggingNodeId: null,
   dragOffset: { x: 0, y: 0 },
   activeLinkDrag: null, // { fromNodeId, fromPortId, type, startX, startY, isInput }
+  activeResizingNodeId: null,
+  resizeStartSize: { width: 0, height: 0 },
+  resizeStartMouse: { x: 0, y: 0 },
   
   // Runtime Interpreter State
   runnerState: 'idle', // 'idle' | 'running' | 'paused' | 'error' | 'success'
@@ -226,6 +229,8 @@ const TRANSLATIONS = {
     config_endpoint: 'API Endpoint URL',
     config_endpoint_helper: 'For local Ollama, LM Studio, etc.',
     config_model: 'Model Name',
+    config_model_helper: 'Leave empty to use server\'s default model',
+    config_fetch_models: 'Fetch Models',
     config_apikey: 'API Key (Optional)',
     config_guide_title: 'Guide & Troubleshooting',
     config_cors_title: 'Local CORS Error',
@@ -316,6 +321,8 @@ const TRANSLATIONS = {
     config_endpoint: 'APIエンドポイントURL',
     config_endpoint_helper: 'ローカルの Ollama や LM Studio など',
     config_model: '使用モデル名',
+    config_model_helper: '空欄の場合はサーバーのデフォルトモデルを使用します',
+    config_fetch_models: 'モデル一覧を取得',
     config_apikey: 'APIキー（任意）',
     config_guide_title: 'ヘルプとトラブルシューティング',
     config_cors_title: 'ローカルAPIのCORSエラー',
@@ -421,6 +428,30 @@ function initTabs() {
 /**
  * Detect browser local Chrome Built-in AI capability
  */
+/**
+ * Global helper to locate Chrome's Built-in AI interface across changing specifications
+ * @returns {object|null} The resolved LanguageModel/assistant interface object, or null
+ */
+function getChromeAiInterface() {
+  // 1. WICG standard Prompt API 'ai.languageModel'
+  if (typeof ai !== 'undefined' && typeof ai.languageModel !== 'undefined') {
+    return ai.languageModel;
+  }
+  // 2. window.ai.languageModel namespace
+  if (typeof window !== 'undefined' && typeof window.ai !== 'undefined' && typeof window.ai.languageModel !== 'undefined') {
+    return window.ai.languageModel;
+  }
+  // 3. window.ai.assistant namespace (older Canary spec)
+  if (typeof window !== 'undefined' && typeof window.ai !== 'undefined' && typeof window.ai.assistant !== 'undefined') {
+    return window.ai.assistant;
+  }
+  // 4. Global LanguageModel class (alternative draft spec)
+  if (typeof LanguageModel !== 'undefined') {
+    return LanguageModel;
+  }
+  return null;
+}
+
 async function checkChromeAi() {
   const badge = document.getElementById('provider-badge-text');
   const badgeContainer = document.getElementById('provider-badge');
@@ -429,22 +460,36 @@ async function checkChromeAi() {
   
   if (!desc || !badge || !statusBlock || !badgeContainer) return;
   
-  const isAvailable = typeof window.ai !== 'undefined' && typeof window.ai.languageModel !== 'undefined';
+  const aiModel = getChromeAiInterface();
   
-  if (isAvailable) {
+  if (aiModel) {
     try {
-      const capabilities = await window.ai.languageModel.capabilities();
-      state.chromeAiAvailable = capabilities.available !== 'no';
+      // Determine availability or capabilities based on spec versions
+      let available = 'no';
+      let capabilities = null;
+      
+      if (typeof aiModel.availability === 'function') {
+        const availRes = await aiModel.availability();
+        available = (availRes === 'available' || availRes === 'downloadable' || availRes === 'downloading') ? 'yes' : 'no';
+        capabilities = { available: availRes };
+      } else if (typeof aiModel.capabilities === 'function') {
+        const caps = await aiModel.capabilities();
+        available = caps.available;
+        capabilities = caps;
+      }
+      
+      state.chromeAiAvailable = (available === 'yes' || available === 'available' || available === 'downloadable' || available === 'downloading');
       state.chromeAiCapabilities = capabilities;
       
       if (state.chromeAiAvailable) {
+        const statusText = capabilities.available || available;
         desc.innerText = state.lang === 'en'
-          ? `Gemini Nano detected and ready (Capability: ${capabilities.available}).`
-          : `Gemini Nano が検出され、利用可能です (ステータス: ${capabilities.available})。`;
+          ? `Gemini Nano detected and ready (Status: ${statusText}).`
+          : `Gemini Nano が検出され、利用可能です (ステータス: ${statusText})。`;
         statusBlock.className = 'info-block success';
         badgeContainer.className = 'status-badge success';
         badge.innerText = 'LLM: Chrome AI';
-        badge.removeAttribute('data-i18n'); // Remove localization key to prevent overwrite
+        badge.removeAttribute('data-i18n');
         log(state.lang === 'en' ? 'Chrome Built-in AI (Gemini Nano) detected successfully.' : 'Chrome 組み込み AI (Gemini Nano) を検出しました。', 'success');
         updateLlmProvider('chrome-ai');
       } else {
@@ -505,6 +550,97 @@ function updateLlmProvider(provider) {
       badgeText.innerText = 'LLM: Chrome AI';
       badgeText.removeAttribute('data-i18n');
     }
+  }
+}
+
+/**
+ * Query external OpenAI-compatible server for available models list
+ * and populate datalist options for autocomplete
+ */
+async function fetchModels() {
+  const fetchBtn = document.getElementById('fetch-models-btn');
+  const datalist = document.getElementById('settings-model-datalist');
+  if (!fetchBtn || !datalist) return;
+  
+  if (!state.apiEndpoint) {
+    const msg = state.lang === 'en' ? 'Please set the API Endpoint URL first.' : '先にAPIエンドポイントURLを設定してください。';
+    log(msg, 'warning');
+    showAlert(state.lang === 'en' ? 'API Error' : 'APIエラー', msg);
+    return;
+  }
+  
+  let endpoint = state.apiEndpoint.trim();
+  if (endpoint.endsWith('/')) {
+    endpoint = endpoint.slice(0, -1);
+  }
+  if (endpoint.endsWith('/chat/completions')) {
+    endpoint = endpoint.slice(0, -17);
+  }
+  
+  const originalText = fetchBtn.innerHTML;
+  fetchBtn.disabled = true;
+  fetchBtn.innerHTML = `🔄 <span>${state.lang === 'en' ? 'Fetching...' : '取得中...'}</span>`;
+  
+  try {
+    const headers = {};
+    if (state.apiKey) {
+      headers['Authorization'] = `Bearer ${state.apiKey}`;
+    }
+    
+    log(state.lang === 'en' ? 'Fetching models list from server...' : 'サーバーからモデル一覧を取得しています...', 'info');
+    
+    const response = await fetch(`${endpoint}/models`, {
+      method: 'GET',
+      headers: headers
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP Error Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data && Array.isArray(data.data)) {
+      datalist.innerHTML = '';
+      
+      // Populate datalist options
+      data.data.forEach(model => {
+        if (model.id) {
+          const opt = document.createElement('option');
+          opt.value = model.id;
+          datalist.appendChild(opt);
+        }
+      });
+      
+      const count = data.data.length;
+      log(state.lang === 'en' 
+        ? `Successfully fetched ${count} models from server.` 
+        : `サーバーから ${count} 個のモデル一覧を正常に取得しました。`, 'success');
+      
+      // Trigger a visual highlight on the input helper
+      const helper = document.getElementById('model-helper-text');
+      if (helper && count > 0) {
+        const firstModel = data.data[0].id;
+        helper.innerText = state.lang === 'en'
+          ? `Default: ${firstModel} (leave empty to use)`
+          : `デフォルト: ${firstModel} (空欄の場合はこれが使用されます)`;
+        helper.style.color = 'var(--primary)';
+        setTimeout(() => {
+          helper.style.color = '';
+        }, 3000);
+      }
+    } else {
+      throw new Error('Invalid response format (data array not found).');
+    }
+  } catch (err) {
+    log(`Failed to fetch models: ${err.message}`, 'error');
+    if (err.message.includes('Failed to fetch')) {
+      showCorsErrorModal();
+    } else {
+      showAlert(state.lang === 'en' ? 'Fetch Models Failed' : 'モデル取得失敗', (state.lang === 'en' ? 'Failed to fetch models: ' : 'モデル取得失敗: ') + err.message);
+    }
+  } finally {
+    fetchBtn.disabled = false;
+    fetchBtn.innerHTML = `🔄 <span>${state.lang === 'en' ? 'Fetch Models' : 'モデル一覧を取得'}</span>`;
   }
 }
 
@@ -660,6 +796,8 @@ function renderNode(node) {
   card.id = node.id;
   card.style.left = `${node.x}px`;
   card.style.top = `${node.y}px`;
+  card.style.width = `${node.width || 280}px`;
+  card.style.height = `${node.height || 160}px`;
   
   const template = PORT_TEMPLATES[node.type];
 
@@ -725,6 +863,7 @@ function renderNode(node) {
   html += `</div>`;
 
   html += `</div>`; // End of ports wrapper
+  html += `<div class="node-resize-handle"></div>`; // Resize handle
 
   card.innerHTML = html;
   container.appendChild(card);
@@ -831,6 +970,32 @@ function setupNodeEvents(cardEl, node) {
       e.stopPropagation();
     });
   });
+
+  // Double click node to open prompt editor [Phase 4]
+  cardEl.addEventListener('dblclick', (e) => {
+    if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.port-dot')) return;
+    if (node.type === NODE_TYPES.PROMPT) {
+      openPromptEditor(node);
+    }
+  });
+
+  // Drag Resizing Logic [Phase 4]
+  const resizeHandle = cardEl.querySelector('.node-resize-handle');
+  if (resizeHandle) {
+    resizeHandle.addEventListener('mousedown', (e) => {
+      state.activeResizingNodeId = node.id;
+      state.resizeStartSize = {
+        width: cardEl.offsetWidth,
+        height: cardEl.offsetHeight
+      };
+      state.resizeStartMouse = {
+        x: e.clientX,
+        y: e.clientY
+      };
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
 }
 
 /**
@@ -881,6 +1046,28 @@ function initGlobalDragAndDrop() {
         const ctrlX2 = state.activeLinkDrag.isInput ? x2 + offset : x2 - offset;
         
         tempPath.setAttribute('d', `M ${x1} ${y1} C ${ctrlX1} ${y1}, ${ctrlX2} ${y2}, ${x2} ${y2}`);
+      }
+    }
+
+    // 3. Handle Active Node Resizing [Phase 4]
+    if (state.activeResizingNodeId) {
+      const node = state.nodes.find(n => n.id === state.activeResizingNodeId);
+      if (node) {
+        const card = document.getElementById(node.id);
+        const dx = (e.clientX - state.resizeStartMouse.x) / state.zoom;
+        const dy = (e.clientY - state.resizeStartMouse.y) / state.zoom;
+        
+        const newWidth = Math.max(200, state.resizeStartSize.width + dx);
+        const newHeight = Math.max(120, state.resizeStartSize.height + dy);
+        
+        node.width = newWidth;
+        node.height = newHeight;
+        
+        card.style.width = `${newWidth}px`;
+        card.style.height = `${newHeight}px`;
+        
+        // Redraw SVG link wires
+        drawConnections();
       }
     }
   });
@@ -963,6 +1150,11 @@ function initGlobalDragAndDrop() {
       }
       state.activeLinkDrag = null;
     }
+
+    // 3. Release Node Resizing [Phase 4]
+    if (state.activeResizingNodeId) {
+      state.activeResizingNodeId = null;
+    }
   });
 
   // Double click canvas to deselect nodes
@@ -1023,6 +1215,8 @@ function createNode(type, x, y) {
     title: defaultTitle,
     x: x,
     y: y,
+    width: type === NODE_TYPES.START ? 240 : (type === NODE_TYPES.PROMPT ? 300 : 280),
+    height: type === NODE_TYPES.START ? 130 : 160,
     data: {
       promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
       systemPrompt: type === NODE_TYPES.LLM ? 'You are a professional software engineer.' : '',
@@ -1155,6 +1349,422 @@ function deleteLink(linkId) {
 // ==========================================================================
 
 /**
+ * Open the large overlay Prompt Editor Dialog
+ * @param {object} node Target Prompt Node
+ */
+function openPromptEditor(node) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'prompt-editor-modal';
+  
+  overlay.innerHTML = `
+    <div class="modal-card" style="width: 900px; max-width: 95vw; height: 80vh; border-color: var(--primary);">
+      <div class="modal-header">
+        <span style="font-weight:600; display:flex; align-items:center; gap:8px;">
+          <span style="font-size:16px;">✎</span>
+          <span>${state.lang === 'en' ? 'Edit Prompt Template' : 'プロンプトテンプレートの編集'}: ${node.title}</span>
+        </span>
+        <button id="close-prompt-editor-x" class="modal-close-x">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0; display: flex; height: calc(100% - 110px); overflow: hidden;">
+        <!-- Left side: Text Editor -->
+        <div style="flex: 2; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); height: 100%;">
+          <textarea id="modal-prompt-textarea" style="flex: 1; border: none; background-color: #05080f; color: #f1f5f9; font-family: var(--font-mono); font-size: 13px; padding: 20px; resize: none; outline: none; line-height: 1.6;"></textarea>
+        </div>
+        <!-- Right side: LLM Tools -->
+        <div style="flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 16px; background-color: rgba(0, 0, 0, 0.15); overflow-y: auto;">
+          <h4 style="margin-bottom: 4px;">LLM Actions</h4>
+          
+          <div class="form-group">
+            <button id="modal-prompt-refine-btn" class="btn btn-primary btn-sm" style="width: 100%;">
+              ✨ ${state.lang === 'en' ? 'Refine Template (LLM)' : 'プロンプト自動最適化 (LLM)'}
+            </button>
+          </div>
+          
+          <div class="border-top" style="padding-top: 16px; margin-top: 8px; border-color: var(--border-color);">
+            <h4 style="margin-bottom: 8px;">${state.lang === 'en' ? 'Revise with Instructions' : '指示・フィードバック改修'}</h4>
+            <div class="form-group">
+              <textarea id="modal-prompt-revise-comment" class="node-input-text node-textarea" style="min-height: 80px;" placeholder="${state.lang === 'en' ? 'e.g. Write in Japanese, make it concise...' : '例：日本語で出力して、箇条書きにして...' }"></textarea>
+            </div>
+            <button id="modal-prompt-revise-btn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;" disabled>
+              🔄 ${state.lang === 'en' ? 'Apply Instructions (LLM)' : '指示を反映する (LLM)'}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 11px; color: var(--text-muted);">${state.lang === 'en' ? 'Tip: Use {{variable_name}} to inject variable values.' : 'ヒント: {{変数名}} と書くことで実行時に値が補完されます。'}</span>
+        <div style="display: flex; gap: 8px;">
+          <button id="modal-prompt-save-btn" class="btn btn-primary btn-sm">${state.lang === 'en' ? 'Save Changes' : '変更を保存'}</button>
+          <button id="modal-prompt-cancel-btn" class="btn btn-secondary btn-sm">${state.lang === 'en' ? 'Cancel' : 'キャンセル'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  const textarea = document.getElementById('modal-prompt-textarea');
+  textarea.value = node.data.promptTemplate || '';
+  textarea.focus();
+  
+  // Wire events
+  const closeX = document.getElementById('close-prompt-editor-x');
+  const cancelBtn = document.getElementById('modal-prompt-cancel-btn');
+  const saveBtn = document.getElementById('modal-prompt-save-btn');
+  const refineBtn = document.getElementById('modal-prompt-refine-btn');
+  const reviseBtn = document.getElementById('modal-prompt-revise-btn');
+  const commentInput = document.getElementById('modal-prompt-revise-comment');
+  
+  console.log('Prompt Editor Elements:', { closeX, cancelBtn, saveBtn, refineBtn, reviseBtn, commentInput });
+  
+  let activeAbortController = null;
+  let isOptimizing = false;
+  let saveOnLlmFinish = false;
+
+  // Restore background optimization state if already running
+  const runningReq = state.activeLlmRequests && state.activeLlmRequests[node.id];
+  if (runningReq) {
+    isOptimizing = true;
+    activeAbortController = runningReq.controller;
+  }
+
+  const closeEditor = () => {
+    state.activeEditor = null;
+    overlay.remove();
+  };
+
+  const handleCancelEditor = () => {
+    if (isOptimizing) {
+      const isEn = state.lang === 'en';
+      showChoiceDialog({
+        title: isEn ? 'Confirm Cancel' : 'キャンセルの確認',
+        body: isEn 
+          ? 'An LLM optimization or revision is currently in progress. Are you sure you want to cancel and abort the query?' 
+          : 'プロンプトのAI生成処理が現在実行中です。処理を中断してエディタを閉じますか？',
+        layout: 'row',
+        width: 420,
+        buttons: [
+          {
+            label: isEn ? 'No, Keep Editing' : 'いいえ、編集を続ける',
+            type: 'secondary',
+            onClick: () => {} // Keep editing
+          },
+          {
+            label: isEn ? 'Yes, Abort & Close' : 'はい、処理を中断して閉じる',
+            type: 'secondary',
+            onClick: () => {
+              if (activeAbortController) {
+                activeAbortController.abort();
+              }
+              const card = document.getElementById(node.id);
+              if (card) card.classList.remove('executing');
+              if (state.activeLlmRequests) delete state.activeLlmRequests[node.id];
+              closeEditor();
+            }
+          }
+        ]
+      });
+    } else {
+      closeEditor();
+    }
+  };
+
+  closeX.addEventListener('click', handleCancelEditor);
+  cancelBtn.addEventListener('click', handleCancelEditor);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) handleCancelEditor();
+  });
+
+  const saveAndClose = () => {
+    node.data.promptTemplate = textarea.value;
+    
+    // Update inline card preview
+    const cardField = document.getElementById(node.id).querySelector('.node-body div div');
+    if (cardField) {
+      const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+      cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+    }
+    
+    // Update sidebar inspector if active
+    if (state.selectedNodeId === node.id) {
+      showNodeProperties(node.id);
+    }
+    
+    log(state.lang === 'en' ? 'Prompt template saved.' : 'プロンプトテンプレートを保存しました。', 'info');
+    closeEditor();
+  };
+
+  saveBtn.addEventListener('click', () => {
+    if (isOptimizing) {
+      const isEn = state.lang === 'en';
+      showChoiceDialog({
+        title: isEn ? 'AI Query In Progress' : 'AI処理を実行中',
+        body: isEn 
+          ? 'An LLM optimization or revision is currently in progress. What would you like to save?' 
+          : 'プロンプトのAI生成処理が現在実行中です。どのように保存しますか？',
+        layout: 'stack',
+        width: 450,
+        buttons: [
+          {
+            label: `💾 ${isEn ? 'Save Current Text (Abort AI)' : '現在の表示内容を保存 (AI処理を中止)'}`,
+            type: 'primary',
+            onClick: () => {
+              if (activeAbortController) activeAbortController.abort();
+              saveAndClose();
+            }
+          },
+          {
+            label: `⏳ ${isEn ? 'Wait for AI result & Save' : 'AIの完了を待ってから保存 (エディタを閉じる)'}`,
+            type: 'secondary',
+            onClick: () => {
+              saveOnLlmFinish = true;
+              log(isEn 
+                ? 'Transitioning AI query to background. Saving once complete...' 
+                : 'AI処理をバックグラウンドに移行しました。完了時に自動保存されます...', 'info');
+              closeEditor(); // Close modal immediately
+            }
+          },
+          {
+            label: isEn ? 'Cancel (Return to Edit)' : 'キャンセルして編集に戻る',
+            type: 'secondary',
+            onClick: () => {} // Keep editing
+          }
+        ]
+      });
+    } else {
+      saveAndClose();
+    }
+  });
+
+  const originalRefineText = refineBtn.innerText;
+  const originalReviseText = reviseBtn.innerText;
+
+  // Restore visual buttons state if running in background
+  if (runningReq) {
+    refineBtn.disabled = true;
+    reviseBtn.disabled = true;
+    if (runningReq.type === 'refine') {
+      refineBtn.innerText = state.lang === 'en' ? 'Optimizing...' : '最適化中...';
+    } else if (runningReq.type === 'revise') {
+      reviseBtn.innerText = state.lang === 'en' ? 'Revising...' : '改修中...';
+      commentInput.value = runningReq.comment || '';
+      commentInput.disabled = true;
+    }
+  } else {
+    // Keep disabled until user types feedback
+    reviseBtn.disabled = !commentInput.value.trim();
+  }
+
+  // Dynamically enable/disable Apply Instructions button based on user typing
+  commentInput.addEventListener('input', () => {
+    if (!isOptimizing) {
+      reviseBtn.disabled = !commentInput.value.trim();
+    }
+  });
+
+  // Hook state.activeEditor callbacks to reset buttons when background query finishes
+  state.activeEditor = {
+    nodeId: node.id,
+    setOptimizing: (val) => { isOptimizing = val; },
+    setAbortController: (ctrl) => { activeAbortController = ctrl; },
+    resetButtons: (success = false) => {
+      refineBtn.disabled = false;
+      refineBtn.innerText = originalRefineText;
+      reviseBtn.innerText = originalReviseText;
+      commentInput.disabled = false;
+      
+      if (success) {
+        commentInput.value = '';
+        reviseBtn.disabled = true;
+      } else {
+        // Keep comment text and keep button enabled if comment is not empty on failure
+        reviseBtn.disabled = !commentInput.value.trim();
+      }
+    }
+  };
+
+  refineBtn.addEventListener('click', async () => {
+    if (isOptimizing) return;
+    
+    isOptimizing = true;
+    saveOnLlmFinish = false;
+    activeAbortController = new AbortController();
+    state.activeLlmRequests = state.activeLlmRequests || {};
+    state.activeLlmRequests[node.id] = {
+      controller: activeAbortController,
+      type: 'refine',
+      comment: ''
+    };
+    
+    // Add executing class to node card on canvas to pulse yellow
+    const card = document.getElementById(node.id);
+    if (card) card.classList.add('executing');
+    
+    refineBtn.disabled = true;
+    refineBtn.innerText = state.lang === 'en' ? 'Optimizing...' : '最適化中...';
+    reviseBtn.disabled = true;
+    
+    let success = false;
+    try {
+      const systemPrompt = "You are a professional prompt engineering assistant. Your task is to refine and optimize the user's prompt template to make it clearer, more structured, and highly effective for LLMs. Maintain any double-bracket variable placeholders (like {{variable_name}} or {{file_content}}) exactly as they are. Output ONLY the optimized prompt template itself, without any introductory text, quotes, or markdown code blocks.";
+      const userPrompt = `Optimize this prompt template:\n\n${textarea.value}`;
+      
+      console.log('Sending LLM query to provider:', state.llmProvider);
+      const optimized = await runLlmQuery(systemPrompt, userPrompt, 0.7, activeAbortController.signal);
+      console.log('Received response from LLM:', optimized);
+      
+      // Determine if we should save directly to node (if modal was closed)
+      const modalTextarea = document.getElementById('modal-prompt-textarea');
+      if (modalTextarea) {
+        modalTextarea.value = optimized.trim();
+        log(state.lang === 'en' ? 'Prompt optimized inside editor.' : 'エディタ内でプロンプトの最適化を行いました。', 'success');
+      } else {
+        node.data.promptTemplate = optimized.trim();
+        log(state.lang === 'en' 
+          ? `Background prompt optimization finished successfully for node: ${node.title}.` 
+          : `ノード「${node.title}」のバックグラウンド プロンプト最適化が完了しました。`, 'success');
+      }
+      
+      // Save changes if user requested wait-llm or if editor has closed
+      if (saveOnLlmFinish || !modalTextarea) {
+        // Update inline card preview
+        const cardField = document.getElementById(node.id)?.querySelector('.node-body div div');
+        if (cardField) {
+          const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+          cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+        }
+        
+        // Update sidebar properties if active
+        if (state.selectedNodeId === node.id) {
+          showNodeProperties(node.id);
+        }
+      }
+      success = true;
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        log(state.lang === 'en' ? 'Optimization canceled.' : '最適化処理がキャンセルされました。', 'info');
+      } else {
+        console.error('Refine failed:', e);
+        log(`Optimization failed: ${e.message}`, 'error');
+        if (state.llmProvider === 'openai-compatible') showCorsErrorModal();
+      }
+    } finally {
+      isOptimizing = false;
+      
+      // Always cleanup request registry and indicator
+      if (state.activeLlmRequests) delete state.activeLlmRequests[node.id];
+      if (card) card.classList.remove('executing');
+      
+      if (state.activeEditor && state.activeEditor.nodeId === node.id) {
+        state.activeEditor.setOptimizing(false);
+        state.activeEditor.setAbortController(null);
+        state.activeEditor.resetButtons(success);
+      }
+      activeAbortController = null;
+    }
+  });
+
+  reviseBtn.addEventListener('click', async () => {
+    if (isOptimizing) return;
+    if (!commentInput.value.trim()) {
+      showAlert(
+        state.lang === 'en' ? 'Input Required' : '入力が必要です',
+        state.lang === 'en' ? 'Please enter a feedback comment.' : '指示コメントを入力してください。'
+      );
+      return;
+    }
+    
+    isOptimizing = true;
+    saveOnLlmFinish = false;
+    activeAbortController = new AbortController();
+    state.activeLlmRequests = state.activeLlmRequests || {};
+    state.activeLlmRequests[node.id] = {
+      controller: activeAbortController,
+      type: 'revise',
+      comment: commentInput.value
+    };
+    
+    // Add executing class to node card on canvas to pulse yellow
+    const card = document.getElementById(node.id);
+    if (card) card.classList.add('executing');
+    
+    refineBtn.disabled = true;
+    reviseBtn.disabled = true;
+    reviseBtn.innerText = state.lang === 'en' ? 'Revising...' : '改修中...';
+    commentInput.disabled = true;
+    
+    let success = false;
+    try {
+      const systemPrompt = "You are a professional prompt engineering assistant. Your task is to revise the existing prompt template based on the user's specific feedback or instructions. Ensure you keep the double-bracket variable placeholders (like {{variable_name}}) intact, and apply the requested feedback details. Output ONLY the revised prompt template, without any explanation, intro, or markdown fences.";
+      const userPrompt = `Please revise the following prompt template according to the user instructions. Make sure to apply the instructions precisely.
+
+[User Instructions]
+${commentInput.value}
+
+[Original Prompt Template]
+${textarea.value}`;
+      
+      log(state.lang === 'en' 
+        ? `Applying revision instructions: "${commentInput.value}"` 
+        : `指示コメント:「${commentInput.value}」を適用中...`, 'info');
+      
+      console.log('Sending LLM query to provider:', state.llmProvider);
+      const revised = await runLlmQuery(systemPrompt, userPrompt, 0.7, activeAbortController.signal);
+      console.log('Received response from LLM:', revised);
+      
+      const modalTextarea = document.getElementById('modal-prompt-textarea');
+      if (modalTextarea) {
+        modalTextarea.value = revised.trim();
+        log(state.lang === 'en' ? 'Prompt revised inside editor.' : 'エディタ内でプロンプトの改修を行いました。', 'success');
+      } else {
+        node.data.promptTemplate = revised.trim();
+        log(state.lang === 'en' 
+          ? `Background prompt revision finished successfully for node: ${node.title}.` 
+          : `ノード「${node.title}」のバックグラウンド プロンプト改修が完了しました。`, 'success');
+      }
+      
+      // Save changes if user requested wait-llm or if editor has closed
+      if (saveOnLlmFinish || !modalTextarea) {
+        // Update inline card preview
+        const cardField = document.getElementById(node.id)?.querySelector('.node-body div div');
+        if (cardField) {
+          const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+          cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+        }
+        
+        // Update sidebar properties if active
+        if (state.selectedNodeId === node.id) {
+          showNodeProperties(node.id);
+        }
+      }
+      success = true;
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        log(state.lang === 'en' ? 'Revision canceled.' : '改修処理がキャンセルされました。', 'info');
+      } else {
+        console.error('Revise failed:', e);
+        log(`Revision failed: ${e.message}`, 'error');
+        if (state.llmProvider === 'openai-compatible') showCorsErrorModal();
+      }
+    } finally {
+      isOptimizing = false;
+      
+      // Always cleanup request registry and indicator
+      if (state.activeLlmRequests) delete state.activeLlmRequests[node.id];
+      if (card) card.classList.remove('executing');
+      
+      if (state.activeEditor && state.activeEditor.nodeId === node.id) {
+        state.activeEditor.setOptimizing(false);
+        state.activeEditor.setAbortController(null);
+        state.activeEditor.resetButtons(success);
+      }
+      activeAbortController = null;
+    }
+  });
+}
+
+/**
  * Display selected node parameters in the inspector sidebar panel
  * @param {string} nodeId Node ID
  */
@@ -1192,21 +1802,14 @@ function showNodeProperties(nodeId) {
       </div>
     `;
   } else if (node.type === NODE_TYPES.PROMPT) {
+    const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 100) + (node.data.promptTemplate.length > 100 ? '...' : '')) : '';
     html += `
       <div class="form-group">
         <label>${t.prop_prompt_tmpl}</label>
-        <textarea id="prop-prompt-input" class="node-input-text node-textarea" style="min-height: 120px;" placeholder="Prompt text templates...">${node.data.promptTemplate || ''}</textarea>
-      </div>
-      <!-- Prompt Refiners Skeletons -->
-      <div class="prompt-engineer-row">
-        <button id="prompt-refine-btn" class="btn btn-secondary btn-xs" style="flex-grow:1;" title="${t.prop_prompt_refine}">${t.prop_prompt_refine}</button>
-      </div>
-      <div class="form-group" style="margin-top: 8px;">
-        <label>${t.prop_prompt_revise}</label>
-        <div style="display:flex; gap:4px;">
-          <input type="text" id="prompt-revise-comment" class="node-input-text" placeholder="${t.prop_prompt_revise_comment}">
-          <button id="prompt-revise-btn" class="btn btn-secondary btn-sm">${t.prop_prompt_revise_btn}</button>
-        </div>
+        <div style="font-family: var(--font-mono); font-size:11px; padding: 10px; background-color: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-muted); min-height: 60px; white-space: pre-wrap; margin-bottom: 8px; max-height: 200px; overflow-y: auto;">${displayVal || 'Empty template...'}</div>
+        <button id="open-prompt-editor-btn" class="btn btn-primary btn-sm" style="width: 100%;">
+          📝 ${state.lang === 'en' ? 'Open Prompt Editor' : 'プロンプトエディタを開く'}
+        </button>
       </div>
     `;
   } else if (node.type === NODE_TYPES.LLM) {
@@ -1286,6 +1889,195 @@ function showNodeProperties(nodeId) {
 }
 
 /**
+ * Global LLM Query Executor helper supporting Chrome Built-in AI and OpenAI-compatible API
+ * @param {string} systemPrompt System Instructions
+ * @param {string} userPrompt User Prompt
+ * @param {number} temperature Temperature sampling parameter
+ * @returns {Promise<string>} Content response from LLM
+ */
+async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null) {
+  if (state.llmProvider === 'chrome-ai') {
+    const aiModel = window.ai && (window.ai.languageModel || window.ai.assistant);
+    if (!state.chromeAiAvailable || !window.ai || !aiModel) {
+      throw new Error(state.lang === 'en' 
+        ? 'Chrome Built-in AI is not available. Please verify capability flags or select External API.'
+        : 'Chrome 組み込み AI が利用できません。フラグが有効化されているか確認するか、外部APIを選択してください。');
+    }
+    
+    // Create new session with system prompt instructions
+    const session = await aiModel.create({
+      systemPrompt: systemPrompt,
+      temperature: temperature,
+      signal: signal
+    });
+    
+    try {
+      const result = await session.prompt(userPrompt, { signal });
+      return result;
+    } finally {
+      session.destroy(); // Always cleanup sessions
+    }
+  } else {
+    // External OpenAI-compatible API call
+    if (!state.apiEndpoint) {
+      throw new Error(state.lang === 'en' ? 'API Endpoint URL is not configured in settings.' : 'APIエンドポイントURLが設定されていません。');
+    }
+    
+    let endpoint = state.apiEndpoint.trim();
+    if (endpoint.endsWith('/')) {
+      endpoint = endpoint.slice(0, -1);
+    }
+    if (endpoint.endsWith('/chat/completions')) {
+      endpoint = endpoint.slice(0, -17);
+    }
+    
+    const headers = { 'Content-Type': 'application/json' };
+    if (state.apiKey) {
+      headers['Authorization'] = `Bearer ${state.apiKey}`;
+    }
+    
+    // Resolve model name:
+    // 1. User specified model in settings
+    // 2. First model from our loaded datalist
+    // 3. Fallback default 'qwen2.5-coder:7b'
+    let selectedModel = state.apiModel ? state.apiModel.trim() : '';
+    if (!selectedModel) {
+      const datalist = document.getElementById('settings-model-datalist');
+      if (datalist && datalist.options.length > 0) {
+        selectedModel = datalist.options[0].value;
+      } else {
+        selectedModel = 'qwen2.5-coder:7b';
+      }
+    }
+    
+    log(state.lang === 'en' 
+      ? `Sending query using model: ${selectedModel}` 
+      : `使用モデル: ${selectedModel} でクエリを送信中...`, 'info');
+
+    const body = {
+      model: selectedModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: temperature
+    };
+    
+    const response = await fetch(`${endpoint}/chat/completions`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body),
+      signal: signal
+    });
+    
+    if (!response.ok) {
+      let errorMsg = '';
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.error) {
+          errorMsg = typeof errorData.error === 'object' 
+            ? (errorData.error.message || JSON.stringify(errorData.error)) 
+            : errorData.error;
+        } else if (errorData && errorData.message) {
+          errorMsg = errorData.message;
+        }
+      } catch (jsonErr) {
+        try {
+          errorMsg = await response.text();
+        } catch (txtErr) {
+          errorMsg = 'Unknown server error';
+        }
+      }
+      
+      const details = errorMsg ? ` - ${errorMsg}` : '';
+      throw new Error(`HTTP ${response.status}${details}`);
+    }
+    
+    const data = await response.json();
+    if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
+      throw new Error('API returned an empty or invalid chat completion payload.');
+    }
+    return data.choices[0].message.content;
+  }
+}
+
+/**
+ * Show a sleek, non-blocking custom confirmation dialog with multiple options.
+ * @param {object} options Configuration for the dialog (title, body, borderTheme, buttons, layout, width)
+ */
+function showChoiceDialog(options) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '3000'; // High priority on top of everything
+  
+  let buttonsHtml = '';
+  options.buttons.forEach((btn, idx) => {
+    const btnClass = btn.type === 'primary' ? 'btn-primary' : 'btn-secondary';
+    const widthStyle = options.layout === 'stack' ? 'width: 100%;' : '';
+    buttonsHtml += `<button id="choice-btn-${idx}" class="btn ${btnClass} btn-sm" style="${widthStyle}">${btn.label}</button>`;
+  });
+  
+  const footerLayout = options.layout === 'stack' 
+    ? 'display: flex; flex-direction: column; gap: 8px;' 
+    : 'display: flex; gap: 8px; justify-content: flex-end;';
+  
+  overlay.innerHTML = `
+    <div class="modal-card" style="width: ${options.width || 420}px;">
+      <div class="modal-header">
+        <span style="font-weight:600; font-size:14px; color: var(--text-color);">${options.title}</span>
+      </div>
+      <div class="modal-body" style="padding: 20px; font-size: 13px; line-height: 1.5; color: var(--text-muted);">
+        ${options.body}
+      </div>
+      <div class="modal-footer" style="padding: 15px 20px; ${footerLayout}">
+        ${buttonsHtml}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  options.buttons.forEach((btn, idx) => {
+    document.getElementById(`choice-btn-${idx}`).addEventListener('click', () => {
+      overlay.remove();
+      btn.onClick();
+    });
+  });
+}
+
+/**
+ * Show a sleek, themed alert dialog using showChoiceDialog to completely replace native alert().
+ * @param {string} title Dialog header title
+ * @param {string} message Dialog body message
+ */
+function showAlert(title, message) {
+  const isEn = state.lang === 'en';
+  showChoiceDialog({
+    title: title,
+    body: message,
+    layout: 'row',
+    width: 400,
+    buttons: [
+      {
+        label: isEn ? 'OK' : 'OK',
+        type: 'primary',
+        onClick: () => {}
+      }
+    ]
+  });
+}
+
+/**
+ * Open the CORS warning dialog modal on connection errors
+ */
+function showCorsErrorModal() {
+  const modal = document.getElementById('error-modal');
+  if (modal) {
+    modal.classList.remove('collapsed');
+  }
+}
+
+/**
  * Listen to input modifications inside the Property Inspector Form
  * @param {object} node Target Node data
  */
@@ -1310,27 +2102,11 @@ function wirePropertyControls(node) {
     });
   }
 
-  // Prompt template text modify
-  const promptInput = document.getElementById('prop-prompt-input');
-  if (promptInput) {
-    promptInput.addEventListener('input', (e) => {
-      node.data.promptTemplate = e.target.value;
-      
-      // Update inline label text snippet inside node card
-      const textDiv = document.getElementById(node.id).querySelector('.node-body div div');
-      if (textDiv) {
-        textDiv.innerText = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : 'Empty Template';
-      }
-    });
-    
-    // Wire up prompt engineering buttons (Skeletons for Phase 4)
-    document.getElementById('prompt-refine-btn').addEventListener('click', () => {
-      log('Prompt optimization request triggered. Refinement logic will execute in Phase 4.', 'info');
-    });
-    
-    document.getElementById('prompt-revise-btn').addEventListener('click', () => {
-      const commentInput = document.getElementById('prompt-revise-comment');
-      log(`Prompt revision requested with comment: "${commentInput.value}". Revision logic will execute in Phase 4.`, 'info');
+  // Prompt Node edit trigger [Phase 4]
+  const openEditorBtn = document.getElementById('open-prompt-editor-btn');
+  if (openEditorBtn) {
+    openEditorBtn.addEventListener('click', () => {
+      openPromptEditor(node);
     });
   }
 
@@ -1475,7 +2251,7 @@ async function connectDirectory() {
       ? 'Browser Directory Access API is not supported in this browser. Please use Chrome/Edge.'
       : 'ブラウザの Directory Access API がサポートされていません。Chrome または Edge をご使用ください。';
     log(msg, 'error');
-    alert(msg);
+    showAlert(state.lang === 'en' ? 'Browser Compatibility' : 'ブラウザの互換性', msg);
     return;
   }
   try {
@@ -1711,12 +2487,26 @@ function initEvents() {
     const input = document.getElementById(id);
     if (input) {
       input.addEventListener('change', (e) => {
-        if (id === 'settings-api-url') state.apiEndpoint = e.target.value;
+        if (id === 'settings-api-url') {
+          state.apiEndpoint = e.target.value;
+          if (state.apiEndpoint.trim()) {
+            fetchModels();
+          }
+        }
         if (id === 'settings-api-model') state.apiModel = e.target.value;
         if (id === 'settings-api-key') state.apiKey = e.target.value;
       });
     }
   });
+
+  // Fetch models button wiring
+  const fetchModelsBtn = document.getElementById('fetch-models-btn');
+  if (fetchModelsBtn) {
+    fetchModelsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      fetchModels();
+    });
+  }
 
   // Modal actions
   const closeErrorBtn = document.getElementById('close-error-modal-btn');
@@ -1734,8 +2524,34 @@ function initEvents() {
   if (openSettingsBtn) {
     openSettingsBtn.addEventListener('click', () => {
       closeModal();
+      
+      // If Prompt Editor modal is open, autosave draft and close it
+      const editorModal = document.getElementById('prompt-editor-modal');
+      if (editorModal) {
+        const textarea = document.getElementById('modal-prompt-textarea');
+        if (textarea && state.selectedNodeId) {
+          const node = state.nodes.find(n => n.id === state.selectedNodeId);
+          if (node) {
+            node.data.promptTemplate = textarea.value;
+            // Update node card preview on canvas
+            const cardField = document.getElementById(node.id).querySelector('.node-body div div');
+            if (cardField) {
+              const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+              cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+            }
+          }
+        }
+        editorModal.remove();
+        log(state.lang === 'en' 
+          ? 'Prompt draft autosaved before redirecting to settings.' 
+          : '設定画面に移動するため、プロンプトの下書きを自動保存しました。', 'info');
+      }
+      
+      // Select the Config settings tab in the right sidebar
       const settingsTabBtn = document.querySelector('.tab-btn[data-tab="tab-settings"]');
-      if (settingsTabBtn) settingsTabBtn.click();
+      if (settingsTabBtn) {
+        settingsTabBtn.click();
+      }
     });
   }
   
@@ -1783,6 +2599,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initGlobalDragAndDrop();
   initEvents();
   checkChromeAi();
+  
+  // Auto-fetch models on startup if using external API mode
+  if (state.llmProvider === 'openai-compatible' && state.apiEndpoint) {
+    fetchModels();
+  }
   
   // Spawn basic Start & Output nodes as template placeholders
   createNode(NODE_TYPES.START, 100, 200);

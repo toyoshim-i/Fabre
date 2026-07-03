@@ -298,8 +298,15 @@
                   <span class="input-helper" data-i18n="config_endpoint_helper">For local Ollama, LM Studio, etc.</span>
                 </div>
                 <div class="form-group">
-                  <label for="settings-api-model" data-i18n="config_model">Model Name</label>
-                  <input type="text" id="settings-api-model" placeholder="qwen2.5-coder:7b">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label for="settings-api-model" data-i18n="config_model" style="margin-bottom: 0;">Model Name</label>
+                    <button id="fetch-models-btn" class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 10px;">
+                      🔄 <span data-i18n="config_fetch_models">Fetch Models</span>
+                    </button>
+                  </div>
+                  <input type="text" id="settings-api-model" list="settings-model-datalist" placeholder="qwen2.5-coder:7b">
+                  <datalist id="settings-model-datalist"></datalist>
+                  <span class="input-helper" id="model-helper-text" data-i18n="config_model_helper">Leave empty to use server's default model</span>
                 </div>
                 <div class="form-group">
                   <label for="settings-api-key" data-i18n="config_apikey">API Key (Optional)</label>
