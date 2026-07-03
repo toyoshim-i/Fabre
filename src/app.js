@@ -1415,6 +1415,7 @@ function openPromptEditor(node) {
   const refineBtn = document.getElementById('modal-prompt-refine-btn');
   const reviseBtn = document.getElementById('modal-prompt-revise-btn');
   const commentInput = document.getElementById('modal-prompt-revise-comment');
+  commentInput.value = node.data.reviseComment || '';
   
   console.log('Prompt Editor Elements:', { closeX, cancelBtn, saveBtn, refineBtn, reviseBtn, commentInput });
   
@@ -1478,6 +1479,7 @@ function openPromptEditor(node) {
 
   const saveAndClose = () => {
     node.data.promptTemplate = textarea.value;
+    node.data.reviseComment = commentInput.value;
     
     // Update inline card preview
     const cardField = document.getElementById(node.id).querySelector('.node-body div div');
@@ -1575,6 +1577,7 @@ function openPromptEditor(node) {
       commentInput.disabled = false;
       
       if (success) {
+        node.data.reviseComment = '';
         commentInput.value = '';
         reviseBtn.disabled = true;
       } else {
@@ -1717,8 +1720,10 @@ ${textarea.value}`;
       if (modalTextarea) {
         modalTextarea.value = revised.trim();
         log(state.lang === 'en' ? 'Prompt revised inside editor.' : 'エディタ内でプロンプトの改修を行いました。', 'success');
+        node.data.reviseComment = '';
       } else {
         node.data.promptTemplate = revised.trim();
+        node.data.reviseComment = '';
         log(state.lang === 'en' 
           ? `Background prompt revision finished successfully for node: ${node.title}.` 
           : `ノード「${node.title}」のバックグラウンド プロンプト改修が完了しました。`, 'success');
@@ -2529,10 +2534,14 @@ function initEvents() {
       const editorModal = document.getElementById('prompt-editor-modal');
       if (editorModal) {
         const textarea = document.getElementById('modal-prompt-textarea');
+        const commentInput = document.getElementById('modal-prompt-revise-comment');
         if (textarea && state.selectedNodeId) {
           const node = state.nodes.find(n => n.id === state.selectedNodeId);
           if (node) {
             node.data.promptTemplate = textarea.value;
+            if (commentInput) {
+              node.data.reviseComment = commentInput.value;
+            }
             // Update node card preview on canvas
             const cardField = document.getElementById(node.id).querySelector('.node-body div div');
             if (cardField) {
