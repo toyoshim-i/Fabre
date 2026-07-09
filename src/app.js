@@ -452,6 +452,19 @@ function getChromeAiInterface() {
   return null;
 }
 
+/**
+ * Retrieve the default system prompt instructions for optimizing templates
+ * @param {string} lang Language code ('en' | 'ja')
+ * @returns {string} The default optimization prompt
+ */
+function getDefaultSystemPrompt(lang = state.lang) {
+  if (lang === 'en') {
+    return "You are a professional prompt engineering assistant. Your task is to refine and optimize the user's prompt template to make it clearer, more structured, and highly effective for LLMs. Maintain any double-bracket variable placeholders (like {{variable_name}} or {{file_content}}) exactly as they are. Output ONLY the optimized prompt template itself, without any introductory text, quotes, or markdown code blocks.";
+  } else {
+    return "あなたはプロフェッショナルなプロンプトエンジニアリングのアシスタントです。ユーザーのプロンプトテンプレートをより明確で構造化され、LLMにとって効果的なものに最適化・洗練することがタスクです。{{variable_name}}のような二重ブラケットの変数プレースホルダーはそのまま保持してください。説明や前置き、マークダウンのコードブロックは一切出力せず、最適化されたプロンプトテンプレートのみを出力してください。";
+  }
+}
+
 async function checkChromeAi() {
   const badge = document.getElementById('provider-badge-text');
   const badgeContainer = document.getElementById('provider-badge');
@@ -1219,7 +1232,9 @@ function createNode(type, x, y) {
     height: type === NODE_TYPES.START ? 130 : 160,
     data: {
       promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
-      systemPrompt: type === NODE_TYPES.LLM ? 'You are a professional software engineer.' : '',
+      systemPrompt: type === NODE_TYPES.LLM 
+        ? 'You are a professional software engineer.' 
+        : (type === NODE_TYPES.PROMPT ? getDefaultSystemPrompt() : ''),
       temperature: 0.7,
       conditionType: 'contains',
       conditionValue: 'PASS',
@@ -1372,24 +1387,15 @@ function openPromptEditor(node) {
           <textarea id="modal-prompt-textarea" style="flex: 1; border: none; background-color: #05080f; color: #f1f5f9; font-family: var(--font-mono); font-size: 13px; padding: 20px; resize: none; outline: none; line-height: 1.6;"></textarea>
         </div>
         <!-- Right side: LLM Tools -->
-        <div style="flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 16px; background-color: rgba(0, 0, 0, 0.15); overflow-y: auto;">
-          <h4 style="margin-bottom: 4px;">LLM Actions</h4>
-          
-          <div class="form-group">
-            <button id="modal-prompt-refine-btn" class="btn btn-primary btn-sm" style="width: 100%;">
-              ✨ ${state.lang === 'en' ? 'Refine Template (LLM)' : 'プロンプト自動最適化 (LLM)'}
-            </button>
+        <div style="flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 12px; background-color: rgba(0, 0, 0, 0.15); height: 100%; box-sizing: border-box;">
+          <h4 style="margin: 0 0 4px 0;">${state.lang === 'en' ? 'System Instructions' : 'システム指示 (役割・追加命令)'}</h4>
+          <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin: 0 0 8px 0; min-height: 0;">
+            <textarea id="modal-prompt-system-textarea" class="node-input-text node-textarea" style="flex: 1; min-height: 0; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; resize: none; padding: 12px; box-sizing: border-box; background-color: rgba(0,0,0,0.25); border: 1px solid var(--border-color); outline: none; border-radius: 6px;" placeholder="${state.lang === 'en' ? 'System prompt for optimization...' : '最適化時の役割・命令を入力...' }"></textarea>
           </div>
           
-          <div class="border-top" style="padding-top: 16px; margin-top: 8px; border-color: var(--border-color);">
-            <h4 style="margin-bottom: 8px;">${state.lang === 'en' ? 'Revise with Instructions' : '指示・フィードバック改修'}</h4>
-            <div class="form-group">
-              <textarea id="modal-prompt-revise-comment" class="node-input-text node-textarea" style="min-height: 80px;" placeholder="${state.lang === 'en' ? 'e.g. Write in Japanese, make it concise...' : '例：日本語で出力して、箇条書きにして...' }"></textarea>
-            </div>
-            <button id="modal-prompt-revise-btn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;" disabled>
-              🔄 ${state.lang === 'en' ? 'Apply Instructions (LLM)' : '指示を反映する (LLM)'}
-            </button>
-          </div>
+          <button id="modal-prompt-refine-btn" class="btn btn-primary btn-sm" style="width: 100%; margin: 0;">
+            ✨ ${state.lang === 'en' ? 'Refine Template (LLM)' : 'プロンプト自動最適化 (LLM)'}
+          </button>
         </div>
       </div>
       <div class="modal-footer" style="padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
@@ -1413,11 +1419,17 @@ function openPromptEditor(node) {
   const cancelBtn = document.getElementById('modal-prompt-cancel-btn');
   const saveBtn = document.getElementById('modal-prompt-save-btn');
   const refineBtn = document.getElementById('modal-prompt-refine-btn');
-  const reviseBtn = document.getElementById('modal-prompt-revise-btn');
-  const commentInput = document.getElementById('modal-prompt-revise-comment');
-  commentInput.value = node.data.reviseComment || '';
+  const systemTextarea = document.getElementById('modal-prompt-system-textarea');
+  systemTextarea.value = node.data.systemPrompt || getDefaultSystemPrompt();
   
-  console.log('Prompt Editor Elements:', { closeX, cancelBtn, saveBtn, refineBtn, reviseBtn, commentInput });
+  // Restore default system prompt on blur if completely empty
+  systemTextarea.addEventListener('blur', () => {
+    if (!systemTextarea.value.trim()) {
+      systemTextarea.value = getDefaultSystemPrompt();
+    }
+  });
+
+  console.log('Prompt Editor Elements:', { closeX, cancelBtn, saveBtn, refineBtn, systemTextarea });
   
   let activeAbortController = null;
   let isOptimizing = false;
@@ -1441,7 +1453,7 @@ function openPromptEditor(node) {
       showChoiceDialog({
         title: isEn ? 'Confirm Cancel' : 'キャンセルの確認',
         body: isEn 
-          ? 'An LLM optimization or revision is currently in progress. Are you sure you want to cancel and abort the query?' 
+          ? 'An LLM optimization is currently in progress. Are you sure you want to cancel and abort the query?' 
           : 'プロンプトのAI生成処理が現在実行中です。処理を中断してエディタを閉じますか？',
         layout: 'row',
         width: 420,
@@ -1479,7 +1491,7 @@ function openPromptEditor(node) {
 
   const saveAndClose = () => {
     node.data.promptTemplate = textarea.value;
-    node.data.reviseComment = commentInput.value;
+    node.data.systemPrompt = systemTextarea.value;
     
     // Update inline card preview
     const cardField = document.getElementById(node.id).querySelector('.node-body div div');
@@ -1503,7 +1515,7 @@ function openPromptEditor(node) {
       showChoiceDialog({
         title: isEn ? 'AI Query In Progress' : 'AI処理を実行中',
         body: isEn 
-          ? 'An LLM optimization or revision is currently in progress. What would you like to save?' 
+          ? 'An LLM optimization is currently in progress. What would you like to save?' 
           : 'プロンプトのAI生成処理が現在実行中です。どのように保存しますか？',
         layout: 'stack',
         width: 450,
@@ -1540,30 +1552,13 @@ function openPromptEditor(node) {
   });
 
   const originalRefineText = refineBtn.innerText;
-  const originalReviseText = reviseBtn.innerText;
 
   // Restore visual buttons state if running in background
   if (runningReq) {
     refineBtn.disabled = true;
-    reviseBtn.disabled = true;
-    if (runningReq.type === 'refine') {
-      refineBtn.innerText = state.lang === 'en' ? 'Optimizing...' : '最適化中...';
-    } else if (runningReq.type === 'revise') {
-      reviseBtn.innerText = state.lang === 'en' ? 'Revising...' : '改修中...';
-      commentInput.value = runningReq.comment || '';
-      commentInput.disabled = true;
-    }
-  } else {
-    // Keep disabled until user types feedback
-    reviseBtn.disabled = !commentInput.value.trim();
+    refineBtn.innerText = state.lang === 'en' ? 'Optimizing...' : '最適化中...';
+    systemTextarea.disabled = true;
   }
-
-  // Dynamically enable/disable Apply Instructions button based on user typing
-  commentInput.addEventListener('input', () => {
-    if (!isOptimizing) {
-      reviseBtn.disabled = !commentInput.value.trim();
-    }
-  });
 
   // Hook state.activeEditor callbacks to reset buttons when background query finishes
   state.activeEditor = {
@@ -1573,17 +1568,7 @@ function openPromptEditor(node) {
     resetButtons: (success = false) => {
       refineBtn.disabled = false;
       refineBtn.innerText = originalRefineText;
-      reviseBtn.innerText = originalReviseText;
-      commentInput.disabled = false;
-      
-      if (success) {
-        node.data.reviseComment = '';
-        commentInput.value = '';
-        reviseBtn.disabled = true;
-      } else {
-        // Keep comment text and keep button enabled if comment is not empty on failure
-        reviseBtn.disabled = !commentInput.value.trim();
-      }
+      systemTextarea.disabled = false;
     }
   };
 
@@ -1606,16 +1591,14 @@ function openPromptEditor(node) {
     
     refineBtn.disabled = true;
     refineBtn.innerText = state.lang === 'en' ? 'Optimizing...' : '最適化中...';
-    reviseBtn.disabled = true;
+    systemTextarea.disabled = true;
     
     let success = false;
     try {
-      const systemPrompt = "You are a professional prompt engineering assistant. Your task is to refine and optimize the user's prompt template to make it clearer, more structured, and highly effective for LLMs. Maintain any double-bracket variable placeholders (like {{variable_name}} or {{file_content}}) exactly as they are. Output ONLY the optimized prompt template itself, without any introductory text, quotes, or markdown code blocks.";
-      const userPrompt = `Optimize this prompt template:\n\n${textarea.value}`;
+      const systemPrompt = systemTextarea.value;
+      const userPrompt = textarea.value;
       
-      console.log('Sending LLM query to provider:', state.llmProvider);
       const optimized = await runLlmQuery(systemPrompt, userPrompt, 0.7, activeAbortController.signal);
-      console.log('Received response from LLM:', optimized);
       
       // Determine if we should save directly to node (if modal was closed)
       const modalTextarea = document.getElementById('modal-prompt-textarea');
@@ -1668,105 +1651,6 @@ function openPromptEditor(node) {
     }
   });
 
-  reviseBtn.addEventListener('click', async () => {
-    if (isOptimizing) return;
-    if (!commentInput.value.trim()) {
-      showAlert(
-        state.lang === 'en' ? 'Input Required' : '入力が必要です',
-        state.lang === 'en' ? 'Please enter a feedback comment.' : '指示コメントを入力してください。'
-      );
-      return;
-    }
-    
-    isOptimizing = true;
-    saveOnLlmFinish = false;
-    activeAbortController = new AbortController();
-    state.activeLlmRequests = state.activeLlmRequests || {};
-    state.activeLlmRequests[node.id] = {
-      controller: activeAbortController,
-      type: 'revise',
-      comment: commentInput.value
-    };
-    
-    // Add executing class to node card on canvas to pulse yellow
-    const card = document.getElementById(node.id);
-    if (card) card.classList.add('executing');
-    
-    refineBtn.disabled = true;
-    reviseBtn.disabled = true;
-    reviseBtn.innerText = state.lang === 'en' ? 'Revising...' : '改修中...';
-    commentInput.disabled = true;
-    
-    let success = false;
-    try {
-      const systemPrompt = "You are a professional prompt engineering assistant. Your task is to revise the existing prompt template based on the user's specific feedback or instructions. Ensure you keep the double-bracket variable placeholders (like {{variable_name}}) intact, and apply the requested feedback details. Output ONLY the revised prompt template, without any explanation, intro, or markdown fences.";
-      const userPrompt = `Please revise the following prompt template according to the user instructions. Make sure to apply the instructions precisely.
-
-[User Instructions]
-${commentInput.value}
-
-[Original Prompt Template]
-${textarea.value}`;
-      
-      log(state.lang === 'en' 
-        ? `Applying revision instructions: "${commentInput.value}"` 
-        : `指示コメント:「${commentInput.value}」を適用中...`, 'info');
-      
-      console.log('Sending LLM query to provider:', state.llmProvider);
-      const revised = await runLlmQuery(systemPrompt, userPrompt, 0.7, activeAbortController.signal);
-      console.log('Received response from LLM:', revised);
-      
-      const modalTextarea = document.getElementById('modal-prompt-textarea');
-      if (modalTextarea) {
-        modalTextarea.value = revised.trim();
-        log(state.lang === 'en' ? 'Prompt revised inside editor.' : 'エディタ内でプロンプトの改修を行いました。', 'success');
-        node.data.reviseComment = '';
-      } else {
-        node.data.promptTemplate = revised.trim();
-        node.data.reviseComment = '';
-        log(state.lang === 'en' 
-          ? `Background prompt revision finished successfully for node: ${node.title}.` 
-          : `ノード「${node.title}」のバックグラウンド プロンプト改修が完了しました。`, 'success');
-      }
-      
-      // Save changes if user requested wait-llm or if editor has closed
-      if (saveOnLlmFinish || !modalTextarea) {
-        // Update inline card preview
-        const cardField = document.getElementById(node.id)?.querySelector('.node-body div div');
-        if (cardField) {
-          const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
-          cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
-        }
-        
-        // Update sidebar properties if active
-        if (state.selectedNodeId === node.id) {
-          showNodeProperties(node.id);
-        }
-      }
-      success = true;
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        log(state.lang === 'en' ? 'Revision canceled.' : '改修処理がキャンセルされました。', 'info');
-      } else {
-        console.error('Revise failed:', e);
-        log(`Revision failed: ${e.message}`, 'error');
-        if (state.llmProvider === 'openai-compatible') showCorsErrorModal();
-      }
-    } finally {
-      isOptimizing = false;
-      
-      // Always cleanup request registry and indicator
-      if (state.activeLlmRequests) delete state.activeLlmRequests[node.id];
-      if (card) card.classList.remove('executing');
-      
-      if (state.activeEditor && state.activeEditor.nodeId === node.id) {
-        state.activeEditor.setOptimizing(false);
-        state.activeEditor.setAbortController(null);
-        state.activeEditor.resetButtons(success);
-      }
-      activeAbortController = null;
-    }
-  });
 }
 
 /**
@@ -1902,6 +1786,7 @@ function showNodeProperties(nodeId) {
  */
 async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null) {
   let responseContent = '';
+  console.log(`[LLM Query Request] Provider: ${state.llmProvider}`);
   if (state.llmProvider === 'chrome-ai') {
     const aiModel = window.ai && (window.ai.languageModel || window.ai.assistant);
     if (!state.chromeAiAvailable || !window.ai || !aiModel) {
@@ -1909,6 +1794,10 @@ async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal =
         ? 'Chrome Built-in AI is not available. Please verify capability flags or select External API.'
         : 'Chrome 組み込み AI が利用できません。フラグが有効化されているか確認するか、外部APIを選択してください。');
     }
+
+    console.log(`[Chrome AI Settings] Temperature: ${temperature}`);
+    console.log(`[Chrome AI System Prompt]\n`, systemPrompt);
+    console.log(`[Chrome AI User Prompt]\n`, userPrompt);
 
     log(
       state.lang === 'en'
@@ -1985,6 +1874,12 @@ ${temperature}`
       loggedHeaders['Authorization'] = 'Bearer ******'; // Mask API Key
     }
 
+    console.log(`[External API Endpoint] POST ${endpoint}/chat/completions`);
+    console.log(`[External API Headers]`, loggedHeaders);
+    console.log(`[External API System Prompt]\n`, systemPrompt);
+    console.log(`[External API User Prompt]\n`, userPrompt);
+    console.log(`[External API Request Body]`, body);
+
     log(
       state.lang === 'en'
         ? `Sending query to External API via endpoint: ${endpoint}`
@@ -2034,6 +1929,8 @@ ${JSON.stringify(body, null, 2)}`
     }
     responseContent = data.choices[0].message.content;
   }
+
+  console.log(`[LLM Query Response]\n`, responseContent);
 
   log(
     state.lang === 'en' ? 'LLM response received successfully.' : 'LLMからの応答を受信しました。',
@@ -2634,11 +2531,31 @@ function initEvents() {
   }
 }
 
+/**
+ * Synchronize settings panel UI values with initial state values
+ */
+function initSettingsUI() {
+  const provider = document.getElementById('settings-provider');
+  if (provider) provider.value = state.llmProvider;
+  
+  const url = document.getElementById('settings-api-url');
+  if (url) url.value = state.apiEndpoint || '';
+  
+  const model = document.getElementById('settings-api-model');
+  if (model) model.value = state.apiModel || '';
+  
+  const key = document.getElementById('settings-api-key');
+  if (key) key.value = state.apiKey || '';
+
+  updateLlmProvider(state.llmProvider);
+}
+
 // DomContentLoaded Initialization entrypoint
 document.addEventListener('DOMContentLoaded', () => {
   // Set default theme and language
   applyTheme(state.theme);
   applyLanguage(state.lang);
+  initSettingsUI();
   
   log('Initializing Fabre v0.1.0 workspace...', 'info');
   initCanvasControls();
