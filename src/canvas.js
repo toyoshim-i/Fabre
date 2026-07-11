@@ -1,0 +1,672 @@
+// Canvas Pan/Zoom Controls, Drag-and-Drop, Port Linkage, and Nodes Rendering
+'use strict';
+
+import { state, NODE_TYPES, NODE_COLORS, NODE_ICONS, PORT_TEMPLATES, TRANSLATIONS } from './state.js';
+import { log, showNodeProperties, openPromptEditor } from './ui.js';
+
+export function updateCanvasTransform() {
+  const canvas = document.getElementById('node-canvas');
+  if (!canvas) return;
+  canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+}
+
+export function initCanvasControls() {
+  const viewport = document.getElementById('canvas-viewport');
+  if (!viewport) return;
+  
+  // Panning Event Listeners
+  viewport.addEventListener('mousedown', (e) => {
+    // Start panning if clicking directly on canvas/viewport (or SVG overlay) or using space/middle-click/right-click
+    const isBgClick = e.target === viewport || e.target.id === 'node-canvas' || e.target.id === 'connections-overlay';
+    const isPanTrigger = isBgClick || e.button === 1 || e.button === 2 || e.spaceKey;
+    
+    if (isPanTrigger) {
+      state.isPanning = true;
+      viewport.style.cursor = 'grabbing';
+      state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (state.isPanning) {
+      state.pan.x = e.clientX - state.panStart.x;
+      state.pan.y = e.clientY - state.panStart.y;
+      updateCanvasTransform();
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (state.isPanning) {
+      state.isPanning = false;
+      viewport.style.cursor = 'grab';
+    }
+  });
+
+  // Prevent browser context menu on canvas right-click so it can be used for panning
+  viewport.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+
+  // Zooming Event (Mouse Wheel)
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = 1.08;
+    const rect = viewport.getBoundingClientRect();
+    
+    // Mouse coords relative to viewport
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Mouse coords relative to unscaled canvas
+    const canvasX = (mouseX - state.pan.x) / state.zoom;
+    const canvasY = (mouseY - state.pan.y) / state.zoom;
+    
+    const nextZoom = e.deltaY < 0 ? state.zoom * zoomFactor : state.zoom / zoomFactor;
+    state.zoom = Math.min(2.0, Math.max(0.25, nextZoom));
+    
+    // Recalculate pan so zooming centers on mouse cursor
+    state.pan.x = mouseX - canvasX * state.zoom;
+    state.pan.y = mouseY - canvasY * state.zoom;
+    
+    updateCanvasTransform();
+  });
+
+  // Canvas Control Buttons
+  document.getElementById('zoom-in-btn').addEventListener('click', () => {
+    state.zoom = Math.min(2.0, state.zoom * 1.25);
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('zoom-out-btn').addEventListener('click', () => {
+    state.zoom = Math.max(0.25, state.zoom / 1.25);
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('zoom-reset-btn').addEventListener('click', () => {
+    state.zoom = 1.0;
+    state.pan = { x: 0, y: 0 };
+    updateCanvasTransform();
+  });
+  
+  document.getElementById('clear-canvas-btn').addEventListener('click', () => {
+    clearCanvas();
+  });
+}
+
+/**
+ * Clear canvas elements
+ */
+export function clearCanvas() {
+  state.nodes = [];
+  state.links = [];
+  state.selectedNodeId = null;
+  document.getElementById('nodes-container').innerHTML = '';
+  drawConnections();
+  const propSection = document.getElementById('node-properties-section');
+  if (propSection) propSection.classList.add('collapsed');
+  log(state.lang === 'en' ? 'Canvas cleared.' : 'キャンバスを初期化しました。', 'warning');
+}
+
+/**
+ * Generate HTML representation of a node and add it to canvas
+ * @param {object} node Node data definition
+ */
+export function renderNode(node) {
+  const container = document.getElementById('nodes-container');
+  if (!container) return;
+
+  const card = document.createElement('div');
+  card.className = `node-card ${state.selectedNodeId === node.id ? 'selected' : ''}`;
+  card.id = node.id;
+  card.style.left = `${node.x}px`;
+  card.style.top = `${node.y}px`;
+  card.style.width = `${node.width || 280}px`;
+  card.style.height = `${node.height || 160}px`;
+  
+  const template = PORT_TEMPLATES[node.type];
+
+  // Compose Node UI Card markup
+  let html = `
+    <div class="node-header" style="background-color: ${NODE_COLORS[node.type]}">
+      <div class="node-title">
+        <span class="node-header-icon">${NODE_ICONS[node.type]}</span>
+        <span>${node.title}</span>
+      </div>
+      <button class="node-delete-btn" title="Delete Node">&times;</button>
+    </div>
+    <div class="node-body">
+  `;
+
+  // Custom visual previews inside node card based on type
+  if (node.type === NODE_TYPES.START) {
+    html += `<div class="node-field-group"><label data-i18n="prop_start_val">Input Value</label><input type="text" class="node-input-text inline-edit" data-prop="inputValue" value="${node.data.inputValue || ''}" placeholder="Initial input text..."></div>`;
+  } else if (node.type === NODE_TYPES.PROMPT) {
+    const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
+    html += `<div class="node-field-group"><label data-i18n="prop_prompt_tmpl">Prompt Template</label><div style="font-family: var(--font-mono); font-size:10px; color:var(--text-muted); min-height:16px;">${displayVal || '<i>Empty Template</i>'}</div></div>`;
+  } else if (node.type === NODE_TYPES.LLM) {
+    html += `<div class="node-field-group"><label data-i18n="prop_llm_temp">Temperature</label><div>${node.data.temperature !== undefined ? node.data.temperature : 0.7}</div></div>`;
+  } else if (node.type === NODE_TYPES.SET_VAR) {
+    html += `<div class="node-field-group"><label data-i18n="prop_var_name">Var Name</label><input type="text" class="node-input-text inline-edit" data-prop="variableName" value="${node.data.variableName || ''}" placeholder="e.g. current_code"></div>`;
+  } else if (node.type === NODE_TYPES.EXTRACTOR) {
+    html += `<div class="node-field-group"><label data-i18n="prop_extractor_type">Target</label><div>${node.data.extractorType || 'code_block'}</div></div>`;
+  } else if (node.type === NODE_TYPES.CONDITION) {
+    html += `<div class="node-field-group"><label data-i18n="prop_cond_type">Rule</label><div>${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"</div></div>`;
+  } else if (node.type === NODE_TYPES.TOOL) {
+    html += `<div class="node-field-group"><label data-i18n="prop_tool_type">Tool</label><div>${node.data.toolType || 'mock_test'}</div></div>`;
+  } else if (node.type === NODE_TYPES.OUTPUT) {
+    html += `<div class="node-field-group"><label data-i18n="prop_output_label">Label</label><input type="text" class="node-input-text inline-edit" data-prop="outputLabel" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Final Result"></div>`;
+  }
+
+  html += `</div>`; // End of body
+
+  // Render ports
+  html += `<div class="node-ports-wrapper">`;
+  
+  // Left Column: Inputs
+  html += `<div class="ports-column inputs">`;
+  template.inputs.forEach(port => {
+    html += `
+      <div class="port-item ${port.type}-color" data-port-id="${port.id}">
+        <div class="port-dot ${port.type}-port" data-port-id="${port.id}" data-port-type="${port.type}" data-is-input="true" style="color: ${port.type === 'flow' ? 'var(--primary)' : 'var(--accent-purple)'}"></div>
+        <span>${port.name}</span>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  
+  // Right Column: Outputs
+  html += `<div class="ports-column outputs">`;
+  template.outputs.forEach(port => {
+    html += `
+      <div class="port-item ${port.type}-color" data-port-id="${port.id}">
+        <span>${port.name}</span>
+        <div class="port-dot ${port.type}-port" data-port-id="${port.id}" data-port-type="${port.type}" data-is-input="false" style="color: ${port.type === 'flow' ? 'var(--primary)' : 'var(--accent-purple)'}"></div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+
+  html += `</div>`; // End of ports wrapper
+  html += `<div class="node-resize-handle"></div>`; // Resize handle
+
+  card.innerHTML = html;
+  container.appendChild(card);
+
+  // Apply localization to node card content
+  applyLanguageToNodeCard(card);
+
+  // Setup Event Listeners for dragging, deleting, selecting
+  setupNodeEvents(card, node);
+}
+
+/**
+ * Update node title and labels inside the card on language switch
+ */
+export function applyLanguageToNodeCard(cardEl) {
+  const t = TRANSLATIONS[state.lang];
+  if (!t) return;
+  cardEl.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) el.innerText = t[key];
+  });
+}
+
+/**
+ * Bind pointer and mouse events to rendered Node Card
+ */
+function setupNodeEvents(cardEl, node) {
+  const header = cardEl.querySelector('.node-header');
+  
+  // Selection
+  cardEl.addEventListener('click', (e) => {
+    // Avoid double trigger if clicking delete button
+    if (e.target.classList.contains('node-delete-btn')) return;
+    
+    selectNode(node.id);
+    e.stopPropagation(); // Prevent canvas background click deselecting
+  });
+  
+  // Dragging Logic
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('node-delete-btn')) return;
+    
+    state.activeDraggingNodeId = node.id;
+    selectNode(node.id);
+    
+    // Start offset calculations
+    state.dragOffset = {
+      x: e.clientX - node.x * state.zoom,
+      y: e.clientY - node.y * state.zoom
+    };
+    
+    header.style.cursor = 'grabbing';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  // Inline Inputs updates
+  cardEl.querySelectorAll('.inline-edit').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const propName = e.target.getAttribute('data-prop');
+      node.data[propName] = e.target.value;
+      if (state.selectedNodeId === node.id) {
+        showNodeProperties(node.id); // Sync right side inspector
+      }
+    });
+    
+    // Prevent dragging node when typing inside inputs
+    input.addEventListener('mousedown', (e) => e.stopPropagation());
+  });
+
+  // Delete Node button click
+  cardEl.querySelector('.node-delete-btn').addEventListener('click', (e) => {
+    deleteNode(node.id);
+    e.stopPropagation();
+  });
+
+  // Wire up port mouse events for connector lines dragging
+  cardEl.querySelectorAll('.port-dot').forEach(dot => {
+    dot.addEventListener('mousedown', (e) => {
+      const portId = dot.getAttribute('data-port-id');
+      const portType = dot.getAttribute('data-port-type');
+      const isInput = dot.getAttribute('data-is-input') === 'true';
+      
+      const portCoords = getPortCenter(node.id, portId);
+      
+      state.activeLinkDrag = {
+        fromNodeId: node.id,
+        fromPortId: portId,
+        type: portType,
+        startX: portCoords.x,
+        startY: portCoords.y,
+        isInput: isInput
+      };
+      
+      // Show temporary svg link dashed line
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) {
+        tempPath.style.display = 'block';
+        tempPath.setAttribute('stroke', portType === 'flow' ? 'var(--primary)' : 'var(--accent-purple)');
+        tempPath.setAttribute('d', `M ${portCoords.x} ${portCoords.y} L ${portCoords.x} ${portCoords.y}`);
+      }
+      
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+
+  // Double click node to open prompt editor
+  cardEl.addEventListener('dblclick', (e) => {
+    if (e.target.closest('input') || e.target.closest('button') || e.target.closest('.port-dot')) return;
+    if (node.type === NODE_TYPES.PROMPT) {
+      openPromptEditor(node);
+    }
+  });
+
+  // Drag Resizing Logic
+  const resizeHandle = cardEl.querySelector('.node-resize-handle');
+  if (resizeHandle) {
+    resizeHandle.addEventListener('mousedown', (e) => {
+      state.activeResizingNodeId = node.id;
+      state.resizeStartSize = {
+        width: cardEl.offsetWidth,
+        height: cardEl.offsetHeight
+      };
+      state.resizeStartMouse = {
+        x: e.clientX,
+        y: e.clientY
+      };
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+}
+
+/**
+ * Handle document pointermove and pointerup globally for node dragging and link connection
+ */
+export function initGlobalDragAndDrop() {
+  document.addEventListener('mousemove', (e) => {
+    // 1. Handle Active Node Dragging
+    if (state.activeDraggingNodeId) {
+      const node = state.nodes.find(n => n.id === state.activeDraggingNodeId);
+      if (node) {
+        // Calculate new X,Y corrected by the viewport zoom scale!
+        node.x = (e.clientX - state.dragOffset.x) / state.zoom;
+        node.y = (e.clientY - state.dragOffset.y) / state.zoom;
+        
+        const card = document.getElementById(node.id);
+        if (card) {
+          card.style.left = `${node.x}px`;
+          card.style.top = `${node.y}px`;
+        }
+        
+        // Redraw SVG link wires
+        drawConnections();
+      }
+    }
+    
+    // 2. Handle Port Link Connection Dragging
+    if (state.activeLinkDrag) {
+      const canvas = document.getElementById('node-canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // Calculate cursor relative to unscaled canvas
+      const mouseX = (e.clientX - canvasRect.left) / state.zoom;
+      const mouseY = (e.clientY - canvasRect.top) / state.zoom;
+      
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) {
+        // Beautify current temporary path drawing
+        const x1 = state.activeLinkDrag.startX;
+        const y1 = state.activeLinkDrag.startY;
+        const x2 = mouseX;
+        const y2 = mouseY;
+        
+        // Curved line dynamically bent based on direction
+        const dx = Math.abs(x2 - x1);
+        const offset = Math.max(50, dx * 0.4);
+        const ctrlX1 = state.activeLinkDrag.isInput ? x1 - offset : x1 + offset;
+        const ctrlX2 = state.activeLinkDrag.isInput ? x2 + offset : x2 - offset;
+        
+        tempPath.setAttribute('d', `M ${x1} ${y1} C ${ctrlX1} ${y1}, ${ctrlX2} ${y2}, ${x2} ${y2}`);
+      }
+    }
+
+    // 3. Handle Active Node Resizing
+    if (state.activeResizingNodeId) {
+      const node = state.nodes.find(n => n.id === state.activeResizingNodeId);
+      if (node) {
+        const card = document.getElementById(node.id);
+        const dx = (e.clientX - state.resizeStartMouse.x) / state.zoom;
+        const dy = (e.clientY - state.resizeStartMouse.y) / state.zoom;
+        
+        const newWidth = Math.max(200, state.resizeStartSize.width + dx);
+        const newHeight = Math.max(120, state.resizeStartSize.height + dy);
+        
+        node.width = newWidth;
+        node.height = newHeight;
+        
+        card.style.width = `${newWidth}px`;
+        card.style.height = `${newHeight}px`;
+        
+        // Redraw SVG link wires
+        drawConnections();
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    // 1. Release Node Dragging
+    if (state.activeDraggingNodeId) {
+      const card = document.getElementById(state.activeDraggingNodeId);
+      if (card) {
+        card.querySelector('.node-header').style.cursor = 'move';
+      }
+      state.activeDraggingNodeId = null;
+    }
+    
+    // 2. Release Link Dragging (Establish Connection)
+    if (state.activeLinkDrag) {
+      const tempPath = document.getElementById('temp-link');
+      if (tempPath) tempPath.style.display = 'none';
+      
+      // Check if released mouse cursor over an opposite port-dot
+      const targetDot = document.elementFromPoint(e.clientX, e.clientY);
+      const isPortDot = targetDot && targetDot.classList.contains('port-dot');
+      
+      if (isPortDot) {
+        const targetPortId = targetDot.getAttribute('data-port-id');
+        const targetPortType = targetDot.getAttribute('data-port-type');
+        const targetIsInput = targetDot.getAttribute('data-is-input') === 'true';
+        
+        // Find parent Node Card ID
+        const targetCard = targetDot.closest('.node-card');
+        const targetNodeId = targetCard ? targetCard.id : null;
+        
+        const sourceNodeId = state.activeLinkDrag.fromNodeId;
+        const sourcePortId = state.activeLinkDrag.fromPortId;
+        const sourceIsInput = state.activeLinkDrag.isInput;
+        const sourceType = state.activeLinkDrag.type;
+        
+        // Validation constraints:
+        // - Different nodes
+        // - Connect flow to flow, data to data only
+        // - Input connects to output or vice-versa
+        const isValidLink = targetNodeId && 
+                            targetNodeId !== sourceNodeId &&
+                            targetPortType === sourceType &&
+                            targetIsInput !== sourceIsInput;
+                            
+        if (isValidLink) {
+          // Identify source and destination port correctly
+          const fromNode = sourceIsInput ? targetNodeId : sourceNodeId;
+          const fromPort = sourceIsInput ? targetPortId : sourcePortId;
+          const toNode = sourceIsInput ? sourceNodeId : targetNodeId;
+          const toPort = sourceIsInput ? sourcePortId : targetPortId;
+          
+          // Prevent duplicates
+          const exists = state.links.some(l => 
+            l.fromNode === fromNode && l.fromPort === fromPort &&
+            l.toNode === toNode && l.toPort === toPort
+          );
+          
+          if (!exists) {
+            // Remove previous connections connected to Flow Input port (Flow inputs usually accept only 1 incoming connection!)
+            // Data inputs can also accept only 1 incoming connection.
+            // Let's delete any existing links targeting (toPort) on (toNode)
+            state.links = state.links.filter(l => !(l.toNode === toNode && l.toPort === toPort));
+            
+            const linkId = `link_${Date.now()}`;
+            state.links.push({
+              id: linkId,
+              fromNode,
+              fromPort,
+              toNode,
+              toPort,
+              type: sourceType
+            });
+            
+            log(state.lang === 'en' ? `Connected port ${fromPort} ➔ ${toPort}.` : `ポート接続を確立しました: ${fromPort} ➔ ${toPort}`, 'success');
+            drawConnections();
+          }
+        }
+      }
+      state.activeLinkDrag = null;
+    }
+
+    // 3. Release Resizing
+    if (state.activeResizingNodeId) {
+      state.activeResizingNodeId = null;
+    }
+  });
+
+  // Handle deselecting nodes when clicking canvas viewport background
+  const viewport = document.getElementById('canvas-viewport');
+  if (viewport) {
+    viewport.addEventListener('click', (e) => {
+      if (e.target === viewport || 
+          e.target.id === 'node-canvas' || 
+          e.target.id === 'connections-overlay') {
+        deselectNodes();
+      }
+    });
+  }
+}
+
+/**
+ * Select a specific Node and highlight it
+ * @param {string} nodeId Target Node ID
+ */
+export function selectNode(nodeId) {
+  state.selectedNodeId = nodeId;
+  document.querySelectorAll('.node-card').forEach(card => {
+    if (card.id === nodeId) {
+      card.classList.add('selected');
+    } else {
+      card.classList.remove('selected');
+    }
+  });
+  
+  // Show properties panel
+  showNodeProperties(nodeId);
+}
+
+/**
+ * Clear Node selections
+ */
+export function deselectNodes() {
+  state.selectedNodeId = null;
+  document.querySelectorAll('.node-card').forEach(card => card.classList.remove('selected'));
+  
+  // Collapse property sidebar
+  const propSection = document.getElementById('node-properties-section');
+  if (propSection) propSection.classList.add('collapsed');
+}
+
+/**
+ * Add a node to the canvas based on selected type
+ * @param {string} type Node type
+ * @param {number} x Canvas relative X coordinate
+ * @param {number} y Canvas relative Y coordinate
+ */
+export function createNode(type, x, y) {
+  const nodeId = `node_${Date.now()}`;
+  const template = PORT_TEMPLATES[type];
+  if (!template) return;
+  
+  const defaultTitle = TRANSLATIONS[state.lang][`node_${type}`] || type;
+  
+  const newNode = {
+    id: nodeId,
+    type: type,
+    title: defaultTitle,
+    x: x,
+    y: y,
+    width: type === NODE_TYPES.START ? 240 : (type === NODE_TYPES.PROMPT ? 300 : 280),
+    height: type === NODE_TYPES.START ? 130 : 160,
+    data: {
+      promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
+      systemPrompt: type === NODE_TYPES.LLM 
+        ? 'You are a professional software engineer.' 
+        : (type === NODE_TYPES.PROMPT ? getDefaultSystemPrompt() : ''),
+      temperature: 0.7,
+      conditionType: 'contains',
+      conditionValue: 'PASS',
+      variableName: type === NODE_TYPES.SET_VAR ? 'current_code' : '',
+      toolType: 'mock_test',
+      outputLabel: type === NODE_TYPES.OUTPUT ? 'Verification Report' : '',
+      inputValue: type === NODE_TYPES.START ? 'Initial source code here' : '',
+      extractorType: 'code_block',
+      extractorPattern: ''
+    }
+  };
+  
+  state.nodes.push(newNode);
+  renderNode(newNode);
+  selectNode(nodeId);
+  drawConnections();
+  
+  log(state.lang === 'en' ? `Added ${type} node.` : `${defaultTitle}ノードを作成しました。`, 'info');
+  return newNode;
+}
+
+/**
+ * Remove node and all connected link wires from canvas
+ * @param {string} nodeId Target Node ID
+ */
+export function deleteNode(nodeId) {
+  state.nodes = state.nodes.filter(n => n.id !== nodeId);
+  
+  // Remove links connected to this node
+  state.links = state.links.filter(l => l.fromNode !== nodeId && l.toNode !== nodeId);
+  
+  const el = document.getElementById(nodeId);
+  if (el) el.remove();
+  
+  if (state.selectedNodeId === nodeId) {
+    deselectNodes();
+  }
+  
+  drawConnections();
+  log(state.lang === 'en' ? `Deleted node ${nodeId}.` : `ノードを削除しました。`, 'warning');
+}
+
+/**
+ * Retrieve absolute coordinates of a port dot center relative to unscaled canvas
+ */
+export function getPortCenter(nodeId, portId) {
+  const nodeEl = document.getElementById(nodeId);
+  if (!nodeEl) return { x: 0, y: 0 };
+  
+  const portEl = nodeEl.querySelector(`[data-port-id="${portId}"]`);
+  if (!portEl) return { x: 0, y: 0 };
+  
+  const canvasEl = document.getElementById('node-canvas');
+  const portRect = portEl.getBoundingClientRect();
+  const canvasRect = canvasEl.getBoundingClientRect();
+  
+  // Remove viewport transform zoom factor to get exact pixel coordinate representation
+  return {
+    x: (portRect.left + portRect.width / 2 - canvasRect.left) / state.zoom,
+    y: (portRect.top + portRect.height / 2 - canvasRect.top) / state.zoom
+  };
+}
+
+/**
+ * Render all lines in SVG connections overlay
+ */
+export function drawConnections() {
+  const linksGroup = document.getElementById('links-group');
+  if (!linksGroup) return;
+  
+  linksGroup.innerHTML = '';
+  
+  state.links.forEach(link => {
+    const start = getPortCenter(link.fromNode, link.fromPort);
+    const end = getPortCenter(link.toNode, link.toPort);
+    
+    // Draw smooth cubic bezier
+    const dx = Math.abs(end.x - start.x);
+    const offset = Math.max(80, dx * 0.4); // Bending offset
+    
+    const x1 = start.x;
+    const y1 = start.y;
+    const x2 = end.x;
+    const y2 = end.y;
+    
+    const d = `M ${x1} ${y1} C ${x1 + offset} ${y1}, ${x2 - offset} ${y2}, ${x2} ${y2}`;
+    
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('data-link-id', link.id);
+    path.className.baseVal = `${link.type}-connection`;
+    
+    // Highlight if active step running (pulse signal animation class)
+    if (state.currentNodeId === link.fromNode && state.runnerState === 'running') {
+      path.className.baseVal += ' active-signal';
+    }
+    
+    // Delete link on double click
+    path.addEventListener('dblclick', () => {
+      deleteLink(link.id);
+    });
+    
+    // Give cursor indication
+    path.addEventListener('mouseover', () => {
+      path.setAttribute('stroke-width', '4');
+    });
+    path.addEventListener('mouseout', () => {
+      path.setAttribute('stroke-width', '2.5');
+    });
+    
+    linksGroup.appendChild(path);
+  });
+}
+
+export function deleteLink(linkId) {
+  state.links = state.links.filter(l => l.id !== linkId);
+  drawConnections();
+  log(state.lang === 'en' ? 'Link removed.' : '接続線を削除しました。', 'warning');
+}
