@@ -359,6 +359,7 @@ const TRANSLATIONS = {
 
 function applyLanguage(langCode) {
   state.lang = langCode;
+  localStorage.setItem('fabre_settings_lang', langCode);
   const t = TRANSLATIONS[langCode];
   if (!t) return;
   
@@ -396,6 +397,7 @@ function applyLanguage(langCode) {
 
 function applyTheme(themeName) {
   state.theme = themeName;
+  localStorage.setItem('fabre_settings_theme', themeName);
   document.body.classList.remove('theme-cyber-dark', 'theme-matrix-green', 'theme-light-slate');
   document.body.classList.add(themeName);
   
@@ -542,6 +544,7 @@ async function checkChromeAi() {
  */
 function updateLlmProvider(provider) {
   state.llmProvider = provider;
+  localStorage.setItem('fabre_settings_llmProvider', provider);
   const select = document.getElementById('settings-provider');
   if (select) select.value = provider;
   
@@ -2428,12 +2431,19 @@ function initEvents() {
       input.addEventListener('change', (e) => {
         if (id === 'settings-api-url') {
           state.apiEndpoint = e.target.value;
+          localStorage.setItem('fabre_settings_apiEndpoint', e.target.value);
           if (state.apiEndpoint.trim()) {
             fetchModels();
           }
         }
-        if (id === 'settings-api-model') state.apiModel = e.target.value;
-        if (id === 'settings-api-key') state.apiKey = e.target.value;
+        if (id === 'settings-api-model') {
+          state.apiModel = e.target.value;
+          localStorage.setItem('fabre_settings_apiModel', e.target.value);
+        }
+        if (id === 'settings-api-key') {
+          state.apiKey = e.target.value;
+          localStorage.setItem('fabre_settings_apiKey', e.target.value);
+        }
       });
     }
   });
@@ -2552,6 +2562,21 @@ function initSettingsUI() {
 
 // DomContentLoaded Initialization entrypoint
 document.addEventListener('DOMContentLoaded', () => {
+  // Load settings from localStorage
+  const savedLang = localStorage.getItem('fabre_settings_lang');
+  const savedTheme = localStorage.getItem('fabre_settings_theme');
+  const savedLlmProvider = localStorage.getItem('fabre_settings_llmProvider');
+  const savedApiEndpoint = localStorage.getItem('fabre_settings_apiEndpoint');
+  const savedApiModel = localStorage.getItem('fabre_settings_apiModel');
+  const savedApiKey = localStorage.getItem('fabre_settings_apiKey');
+  
+  if (savedLang) state.lang = savedLang;
+  if (savedTheme) state.theme = savedTheme;
+  if (savedLlmProvider) state.llmProvider = savedLlmProvider;
+  if (savedApiEndpoint) state.apiEndpoint = savedApiEndpoint;
+  if (savedApiModel) state.apiModel = savedApiModel;
+  if (savedApiKey) state.apiKey = savedApiKey;
+
   // Set default theme and language
   applyTheme(state.theme);
   applyLanguage(state.lang);
