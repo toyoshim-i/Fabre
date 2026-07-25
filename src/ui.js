@@ -120,24 +120,23 @@ export function initUiListeners() {
 
   // 9. Total Steps changes
   state.on('totalStepsChanged', (totalSteps) => {
-    const stepsEl = document.getElementById('runner-steps-count');
+    const stepsEl = document.getElementById('total-steps-val');
     if (stepsEl) stepsEl.innerText = totalSteps;
   });
 }
 
 function updateRunnerUI(runnerState) {
-  const statusBadge = document.getElementById('runner-status-badge');
-  const statusText = document.getElementById('runner-status-text');
-  if (statusBadge && statusText) {
+  const statusBadge = document.getElementById('runner-state-badge');
+  if (statusBadge) {
     const t = TRANSLATIONS[state.lang];
     const key = `status_${runnerState}`;
-    statusText.innerText = t[key] || runnerState.toUpperCase();
-    statusBadge.className = `status-badge ${runnerState === 'running' ? 'info' : (runnerState === 'success' ? 'success' : (runnerState === 'error' ? 'warning' : 'default'))}`;
+    statusBadge.innerText = t[key] || runnerState.toUpperCase();
+    statusBadge.className = `state-badge ${runnerState}`;
   }
 
-  const runBtn = document.getElementById('btn-run-workflow');
-  const stepBtn = document.getElementById('btn-step-workflow');
-  const pauseBtn = document.getElementById('btn-pause-workflow');
+  const runBtn = document.getElementById('run-btn');
+  const stepBtn = document.getElementById('step-btn');
+  const pauseBtn = document.getElementById('pause-btn');
 
   if (runBtn) runBtn.disabled = runnerState === 'running';
   if (stepBtn) stepBtn.disabled = runnerState === 'running';
@@ -147,7 +146,7 @@ function updateRunnerUI(runnerState) {
 }
 
 function updateCurrentNodeUI(nodeId) {
-  const nodeEl = document.getElementById('runner-current-node');
+  const nodeEl = document.getElementById('current-node-name');
   if (nodeEl) {
     const node = state.nodes.find(n => n.id === nodeId);
     nodeEl.innerText = node ? `${node.title} (${node.id})` : (state.lang === 'en' ? 'None' : 'なし');
@@ -155,28 +154,28 @@ function updateCurrentNodeUI(nodeId) {
 
   document.querySelectorAll('.node-card').forEach(card => {
     if (card.id === nodeId) {
-      card.classList.add('active-step');
+      card.classList.add('executing', 'active-step');
     } else {
-      card.classList.remove('active-step');
+      card.classList.remove('executing', 'active-step');
     }
   });
 }
 
 export function initRunnerControls() {
-  const runBtn = document.getElementById('btn-run-workflow');
+  const runBtn = document.getElementById('run-btn');
   if (runBtn) runBtn.addEventListener('click', runWorkflow);
 
-  const stepBtn = document.getElementById('btn-step-workflow');
+  const stepBtn = document.getElementById('step-btn');
   if (stepBtn) stepBtn.addEventListener('click', stepWorkflow);
 
-  const pauseBtn = document.getElementById('btn-pause-workflow');
+  const pauseBtn = document.getElementById('pause-btn');
   if (pauseBtn) pauseBtn.addEventListener('click', pauseWorkflow);
 
-  const resetBtn = document.getElementById('btn-reset-workflow');
+  const resetBtn = document.getElementById('reset-btn');
   if (resetBtn) resetBtn.addEventListener('click', resetWorkflow);
 
-  const delayInput = document.getElementById('runner-delay-input');
-  const delayLabel = document.getElementById('runner-delay-val');
+  const delayInput = document.getElementById('speed-slider');
+  const delayLabel = document.getElementById('speed-value');
   if (delayInput) {
     delayInput.addEventListener('input', (e) => {
       const delay = parseInt(e.target.value, 10);

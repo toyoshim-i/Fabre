@@ -140,7 +140,8 @@ export function initCanvasListeners() {
     const card = document.getElementById(id);
     if (card) {
       card.style.width = `${width}px`;
-      card.style.height = `${height}px`;
+      card.style.minHeight = `${height}px`;
+      card.style.height = 'auto';
     }
   });
   
@@ -235,7 +236,9 @@ export function renderNode(node) {
   card.style.left = `${node.x}px`;
   card.style.top = `${node.y}px`;
   card.style.width = `${node.width || 280}px`;
-  card.style.height = `${node.height || 160}px`;
+  if (node.height) {
+    card.style.minHeight = `${node.height}px`;
+  }
   
   const template = PORT_TEMPLATES[node.type];
 
@@ -483,8 +486,9 @@ export function initGlobalDragAndDrop() {
         const dx = (e.clientX - state.resizeStartMouse.x) / state.zoom;
         const dy = (e.clientY - state.resizeStartMouse.y) / state.zoom;
         
+        const minH = node.type === NODE_TYPES.START ? 140 : 160;
         const newWidth = Math.max(200, state.resizeStartSize.width + dx);
-        const newHeight = Math.max(120, state.resizeStartSize.height + dy);
+        const newHeight = Math.max(minH, state.resizeStartSize.height + dy);
         
         updateNodeSize(node.id, newWidth, newHeight);
       }
@@ -617,7 +621,7 @@ export function createNode(type, x, y) {
     x: x,
     y: y,
     width: type === NODE_TYPES.START ? 240 : (type === NODE_TYPES.PROMPT ? 300 : 280),
-    height: type === NODE_TYPES.START ? 130 : 160,
+    height: type === NODE_TYPES.START ? 140 : 170,
     data: {
       promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
       systemPrompt: type === NODE_TYPES.LLM 

@@ -694,8 +694,8 @@ body.theme-light-slate .node-delete-btn:hover {
   position: relative;
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
-  padding-bottom: 4px;
+  margin-top: 6px;
+  padding: 0 8px 10px 8px;
 }
 
 .ports-column {
@@ -726,10 +726,10 @@ body.theme-light-slate .node-delete-btn:hover {
 }
 
 .ports-column.inputs .port-item {
-  padding-left: 12px;
+  padding-left: 16px;
 }
 .ports-column.outputs .port-item {
-  padding-right: 12px;
+  padding-right: 16px;
 }
 
 /* Port Dots */
@@ -749,11 +749,11 @@ body.theme-light-slate .port-dot {
 }
 
 .ports-column.inputs .port-dot {
-  left: -5px;
+  left: 0px;
 }
 
 .ports-column.outputs .port-dot {
-  right: -5px;
+  right: 0px;
 }
 
 /* Port Categories: Flow vs Data */
