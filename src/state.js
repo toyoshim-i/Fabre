@@ -1,6 +1,8 @@
 // Global Application State & Configuration Constants
 'use strict';
 
+const _listeners = {};
+
 export const state = {
   // Localization & Themes
   lang: 'ja', // 'en' | 'ja'
@@ -44,8 +46,163 @@ export const state = {
   apiModel: 'qwen2.5-coder:7b',
   apiKey: '',
   chromeAiAvailable: false,
-  chromeAiCapabilities: null
+  chromeAiCapabilities: null,
+
+  // Event Emitter Implementation
+  on(event, callback) {
+    if (!_listeners[event]) _listeners[event] = [];
+    _listeners[event].push(callback);
+  },
+  
+  off(event, callback) {
+    if (!_listeners[event]) return;
+    _listeners[event] = _listeners[event].filter(cb => cb !== callback);
+  },
+  
+  emit(event, data) {
+    if (_listeners[event]) {
+      _listeners[event].forEach(cb => {
+        try {
+          cb(data);
+        } catch (e) {
+          console.error(`Error in event listener for ${event}:`, e);
+        }
+      });
+    }
+  }
 };
+
+// ==========================================================================
+// Mutators
+// ==========================================================================
+
+export function setLanguage(lang) {
+  state.lang = lang;
+  state.emit('languageChanged', lang);
+}
+
+export function setTheme(theme) {
+  state.theme = theme;
+  state.emit('themeChanged', theme);
+}
+
+export function setLlmProvider(provider) {
+  state.llmProvider = provider;
+  state.emit('llmProviderChanged', provider);
+}
+
+export function setApiEndpoint(endpoint) {
+  state.apiEndpoint = endpoint;
+  state.emit('apiEndpointChanged', endpoint);
+}
+
+export function setApiModel(model) {
+  state.apiModel = model;
+  state.emit('apiModelChanged', model);
+}
+
+export function setApiKey(key) {
+  state.apiKey = key;
+  state.emit('apiKeyChanged', key);
+}
+
+export function addNode(newNode) {
+  state.nodes.push(newNode);
+  state.emit('nodeAdded', newNode);
+}
+
+export function deleteNode(nodeId) {
+  state.nodes = state.nodes.filter(n => n.id !== nodeId);
+  state.links = state.links.filter(l => l.fromNode !== nodeId && l.toNode !== nodeId);
+  if (state.selectedNodeId === nodeId) {
+    state.selectedNodeId = null;
+    state.emit('selectedNodeChanged', null);
+  }
+  state.emit('nodeDeleted', nodeId);
+  state.emit('linksChanged');
+}
+
+export function updateNodePosition(nodeId, x, y) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (node) {
+    node.x = x;
+    node.y = y;
+    state.emit('nodeMoved', { id: nodeId, x, y });
+  }
+}
+
+export function updateNodeSize(nodeId, width, height) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (node) {
+    node.width = width;
+    node.height = height;
+    state.emit('nodeResized', { id: nodeId, width, height });
+  }
+}
+
+export function updateNodeData(nodeId, key, value) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (node) {
+    node.data[key] = value;
+    state.emit('nodeDataChanged', { id: nodeId, key, value, node });
+  }
+}
+
+export function updateNodeTitle(nodeId, title) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (node) {
+    node.title = title;
+    state.emit('nodeTitleChanged', { id: nodeId, title });
+  }
+}
+
+export function setSelectedNode(nodeId) {
+  state.selectedNodeId = nodeId;
+  state.emit('selectedNodeChanged', nodeId);
+}
+
+export function addLink(link) {
+  // Remove existing links targeting the same destination port
+  state.links = state.links.filter(l => !(l.toNode === link.toNode && l.toPort === link.toPort));
+  state.links.push(link);
+  state.emit('linkAdded', link);
+  state.emit('linksChanged');
+}
+
+export function deleteLink(linkId) {
+  state.links = state.links.filter(l => l.id !== linkId);
+  state.emit('linkDeleted', linkId);
+  state.emit('linksChanged');
+}
+
+export function clearCanvasState() {
+  state.nodes = [];
+  state.links = [];
+  state.selectedNodeId = null;
+  state.emit('canvasCleared');
+  state.emit('selectedNodeChanged', null);
+}
+
+export function setVariable(key, value) {
+  state.variables[key] = value;
+  state.emit('variablesChanged', state.variables);
+}
+
+export function clearVariables() {
+  state.variables = {};
+  state.emit('variablesChanged', state.variables);
+}
+
+export function addLog(text, type = 'info', details = null) {
+  const timestamp = new Date().toLocaleTimeString();
+  const entry = { timestamp, text, type, details };
+  state.logs.push(entry);
+  state.emit('logAdded', entry);
+}
+
+// ==========================================================================
+// Constants & Metadata Definitions
+// ==========================================================================
 
 export const NODE_TYPES = {
   START: 'start',
@@ -353,6 +510,6 @@ export function getDefaultSystemPrompt(lang = state.lang) {
   if (lang === 'en') {
     return "You are a professional prompt engineering assistant. Your task is to refine and optimize the user's prompt template to make it clearer, more structured, and highly effective for LLMs. Maintain any double-bracket variable placeholders (like {{variable_name}} or {{file_content}}) exactly as they are. Output ONLY the optimized prompt template itself, without any introductory text, quotes, or markdown code blocks.";
   } else {
-    return "あなたはプロフェッショナルなプロンプトエンジニアリングのアシスタントです。ユーザーのプロンプトテンプレートをより明確で構造化され、LLMにとって効果的なものに最適化・洗練することがタスクです。{{variable_name}}のような二重ブラケットの変数プレースホルダーはそのまま保持してください。説明や前置き、マークダウンのコードブロックは一切出力せず、最適化されたプロンプトテンプレートのみを出力してください。";
+    return "あなたはプロフェッショナルなプロンプトエンジニアリングのアシスタントです。ユーザーのプロンプトテンプレートをより明確で構造化され、LLMにとって効果的なものに最適化・洗練することがタスクです。{{variable_name}}のような二重ブラケットの変数プレースホルダーはそのまま保持してください。説明や前置き、マークダウン of コードブロックは一切出力せず、最適化されたプロンプトテンプレートのみを出力してください。";
   }
 }

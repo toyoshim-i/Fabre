@@ -1,69 +1,115 @@
 // Themed Custom Dialog Modals, Prompt Overlay Editor, Inspector Panels, and Language/Theme Switching
 'use strict';
 
-import { state, TRANSLATIONS, getDefaultSystemPrompt, NODE_TYPES } from './state.js';
-import { runLlmQuery, updateLlmProvider } from './llm.js';
-import { drawConnections } from './canvas.js';
+import { 
+  state, 
+  TRANSLATIONS, 
+  getDefaultSystemPrompt, 
+  NODE_TYPES,
+  setLanguage,
+  setTheme,
+  setLlmProvider,
+  updateNodeTitle,
+  updateNodeData,
+  setSelectedNode,
+  addLog
+} from './state.js';
+import { runLlmQuery } from './llm.js';
 
 /**
- * Standard log message insertion inside browser console and workspace console log panel
+ * Standard log message wrapper delegating to Model Mutator
  * @param {string} text Log entry description
  * @param {string} type 'info' | 'success' | 'warning' | 'error'
  * @param {string|null} details Optional multiline payload representation
  */
 export function log(text, type = 'info', details = null) {
-  const timestamp = new Date().toLocaleTimeString();
-  const entry = { timestamp, text, type, details };
-  state.logs.push(entry);
-  
-  const container = document.getElementById('logs-container');
-  if (!container) return;
-  
-  if (state.logs.length === 1) {
-    container.innerHTML = '';
-  }
-  
-  const entryEl = document.createElement('div');
-  entryEl.className = `log-entry ${type}`;
-  
-  const metaEl = document.createElement('div');
-  metaEl.className = 'log-meta';
-  metaEl.innerHTML = `<span>[${type.toUpperCase()}]</span><span>${timestamp}</span>`;
-  entryEl.appendChild(metaEl);
-  
-  const textEl = document.createElement('div');
-  textEl.className = 'log-text';
-  textEl.innerText = text;
-  entryEl.appendChild(textEl);
-  
-  if (details) {
-    const detailsEl = document.createElement('pre');
-    detailsEl.className = 'log-details';
-    detailsEl.style.display = 'none';
-    detailsEl.innerText = details;
-    
-    // Toggle details on entry click
-    entryEl.style.cursor = 'pointer';
-    entryEl.addEventListener('click', (e) => {
-      // Prevent toggling if text is selected
-      if (window.getSelection().toString()) return;
-      detailsEl.style.display = detailsEl.style.display === 'none' ? 'block' : 'none';
-    });
-    
-    entryEl.appendChild(detailsEl);
-  }
-  
-  container.appendChild(entryEl);
-  container.scrollTop = container.scrollHeight;
+  addLog(text, type, details);
 }
 
 /**
- * Switch global application UI language and re-translate elements
+ * Switch global application UI language (Delegates to Model Mutator)
  * @param {string} langCode 'en' | 'ja'
  */
 export function applyLanguage(langCode) {
-  state.lang = langCode;
-  localStorage.setItem('fabre_settings_lang', langCode);
+  setLanguage(langCode);
+}
+
+/**
+ * Switch color theme css flags (Delegates to Model Mutator)
+ * @param {string} themeName 'theme-cyber-dark' | 'theme-matrix-green' | 'theme-light-slate'
+ */
+export function applyTheme(themeName) {
+  setTheme(themeName);
+}
+
+/**
+ * Initialize Sidebar Navigation Tabs
+ */
+export function initTabs() {
+  const tabs = document.querySelectorAll('.tab-btn');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Deactivate all tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      // Activate clicked
+      tab.classList.add('active');
+      const contentId = tab.getAttribute('data-tab');
+      const contentEl = document.getElementById(contentId);
+      if (contentEl) contentEl.classList.add('active');
+    });
+  });
+}
+
+/**
+ * Initialize reactive listeners for UI updates
+ */
+export function initUiListeners() {
+  // 1. Language change listener
+  state.on('languageChanged', (langCode) => {
+    localStorage.setItem('fabre_settings_lang', langCode);
+    updateLanguageUI(langCode);
+  });
+
+  // 2. Theme change listener
+  state.on('themeChanged', (themeName) => {
+    localStorage.setItem('fabre_settings_theme', themeName);
+    updateThemeUI(themeName);
+  });
+
+  // 3. Provider changed
+  state.on('llmProviderChanged', (provider) => {
+    localStorage.setItem('fabre_settings_llmProvider', provider);
+    updateLlmProviderUI(provider);
+  });
+
+  // 4. API Endpoints/Model/Key changed
+  state.on('apiEndpointChanged', (endpoint) => {
+    localStorage.setItem('fabre_settings_apiEndpoint', endpoint);
+  });
+  state.on('apiModelChanged', (model) => {
+    localStorage.setItem('fabre_settings_apiModel', model);
+  });
+  state.on('apiKeyChanged', (key) => {
+    localStorage.setItem('fabre_settings_apiKey', key);
+  });
+
+  // 5. Variables changed
+  state.on('variablesChanged', () => {
+    updateVariablesUI();
+  });
+
+  // 6. Log added
+  state.on('logAdded', (entry) => {
+    renderLogEntry(entry);
+  });
+}
+
+/**
+ * Update Language DOM representation
+ */
+function updateLanguageUI(langCode) {
   const t = TRANSLATIONS[langCode];
   if (!t) return;
   
@@ -102,16 +148,13 @@ export function applyLanguage(langCode) {
   state.nodes.forEach(node => {
     const cardEl = document.getElementById(node.id);
     if (cardEl) {
-      // Re-translate simple card labels
       cardEl.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (t[key]) el.innerText = t[key];
       });
-      // Re-translate card header title
       const cardTitleSpan = cardEl.querySelector('.node-title span:last-child');
       if (cardTitleSpan) {
         const defaultTitle = TRANSLATIONS[state.lang][`node_${node.type}`] || node.type;
-        // Only override if the user has not customized the title!
         if (node.title === TRANSLATIONS[langCode === 'en' ? 'ja' : 'en'][`node_${node.type}`] || node.title === defaultTitle) {
           node.title = defaultTitle;
           cardTitleSpan.innerText = defaultTitle;
@@ -122,12 +165,9 @@ export function applyLanguage(langCode) {
 }
 
 /**
- * Switch color theme css flags
- * @param {string} themeName 'theme-cyber-dark' | 'theme-matrix-green' | 'theme-light-slate'
+ * Update Theme CSS DOM representation
  */
-export function applyTheme(themeName) {
-  state.theme = themeName;
-  localStorage.setItem('fabre_settings_theme', themeName);
+function updateThemeUI(themeName) {
   document.body.classList.remove('theme-cyber-dark', 'theme-matrix-green', 'theme-light-slate');
   document.body.classList.add(themeName);
   
@@ -138,23 +178,76 @@ export function applyTheme(themeName) {
 }
 
 /**
- * Initialize Sidebar Navigation Tabs
+ * Update LLM provider visual settings block collapse/expand
  */
-export function initTabs() {
-  const tabs = document.querySelectorAll('.tab-btn');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Deactivate all tabs
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      
-      // Activate clicked
-      tab.classList.add('active');
-      const contentId = tab.getAttribute('data-tab');
-      const contentEl = document.getElementById(contentId);
-      if (contentEl) contentEl.classList.add('active');
+function updateLlmProviderUI(provider) {
+  const select = document.getElementById('settings-provider');
+  if (select) select.value = provider;
+  
+  const openaiBlock = document.getElementById('openai-settings-block');
+  const badgeText = document.getElementById('provider-badge-text');
+  const badgeContainer = document.getElementById('provider-badge');
+  
+  if (provider === 'openai-compatible') {
+    if (openaiBlock) openaiBlock.classList.remove('collapsed');
+    if (badgeContainer && badgeText) {
+      badgeContainer.className = 'status-badge info';
+      badgeText.innerText = 'LLM: Custom API';
+      badgeText.removeAttribute('data-i18n');
+    }
+  } else {
+    if (openaiBlock) openaiBlock.classList.add('collapsed');
+    if (badgeContainer && badgeText && state.chromeAiAvailable) {
+      badgeContainer.className = 'status-badge success';
+      badgeText.innerText = 'LLM: Chrome AI';
+      badgeText.removeAttribute('data-i18n');
+    }
+  }
+}
+
+/**
+ * Render log entry DOM element in log console panel
+ */
+function renderLogEntry(entry) {
+  const { timestamp, text, type, details } = entry;
+  const container = document.getElementById('logs-container');
+  if (!container) return;
+  
+  if (state.logs.length === 1) {
+    container.innerHTML = '';
+  }
+  
+  const entryEl = document.createElement('div');
+  entryEl.className = `log-entry ${type}`;
+  
+  const metaEl = document.createElement('div');
+  metaEl.className = 'log-meta';
+  metaEl.innerHTML = `<span>[${type.toUpperCase()}]</span><span>${timestamp}</span>`;
+  entryEl.appendChild(metaEl);
+  
+  const textEl = document.createElement('div');
+  textEl.className = 'log-text';
+  textEl.innerText = text;
+  entryEl.appendChild(textEl);
+  
+  if (details) {
+    const detailsEl = document.createElement('pre');
+    detailsEl.className = 'log-details';
+    detailsEl.style.display = 'none';
+    detailsEl.innerText = details;
+    
+    // Toggle details on entry click
+    entryEl.style.cursor = 'pointer';
+    entryEl.addEventListener('click', (e) => {
+      if (window.getSelection().toString()) return;
+      detailsEl.style.display = detailsEl.style.display === 'none' ? 'block' : 'none';
     });
-  });
+    
+    entryEl.appendChild(detailsEl);
+  }
+  
+  container.appendChild(entryEl);
+  container.scrollTop = container.scrollHeight;
 }
 
 /**
@@ -286,9 +379,7 @@ function wirePropertyControls(node) {
   const titleInput = document.getElementById('prop-title-input');
   if (titleInput) {
     titleInput.addEventListener('input', (e) => {
-      node.title = e.target.value;
-      const cardTitleSpan = document.getElementById(node.id).querySelector('.node-title span:last-child');
-      if (cardTitleSpan) cardTitleSpan.innerText = node.title;
+      updateNodeTitle(node.id, e.target.value);
     });
   }
 
@@ -296,9 +387,7 @@ function wirePropertyControls(node) {
   const startInput = document.getElementById('prop-start-input');
   if (startInput) {
     startInput.addEventListener('input', (e) => {
-      node.data.inputValue = e.target.value;
-      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="inputValue"]');
-      if (inlineInput) inlineInput.value = node.data.inputValue;
+      updateNodeData(node.id, 'inputValue', e.target.value);
     });
   }
 
@@ -314,19 +403,16 @@ function wirePropertyControls(node) {
   const tempRange = document.getElementById('prop-llm-temp');
   if (tempRange) {
     tempRange.addEventListener('input', (e) => {
-      node.data.temperature = parseFloat(e.target.value);
-      // Update label in properties panel
-      tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${node.data.temperature})`;
-      // Update card preview
-      const tempDiv = document.getElementById(node.id).querySelector('.node-body div div');
-      if (tempDiv) tempDiv.innerText = node.data.temperature;
+      const val = parseFloat(e.target.value);
+      updateNodeData(node.id, 'temperature', val);
+      tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${val})`;
     });
   }
   
   const toolsCheck = document.getElementById('prop-llm-tools');
   if (toolsCheck) {
     toolsCheck.addEventListener('change', (e) => {
-      node.data.enableTools = e.target.checked;
+      updateNodeData(node.id, 'enableTools', e.target.checked);
     });
   }
 
@@ -334,21 +420,18 @@ function wirePropertyControls(node) {
   const extractSelect = document.getElementById('prop-extractor-type');
   if (extractSelect) {
     extractSelect.addEventListener('change', (e) => {
-      node.data.extractorType = e.target.value;
+      updateNodeData(node.id, 'extractorType', e.target.value);
       const patternGroup = document.getElementById('prop-extractor-pattern-group');
       if (patternGroup) {
-        patternGroup.style.display = node.data.extractorType === 'code_block' ? 'none' : 'block';
+        patternGroup.style.display = e.target.value === 'code_block' ? 'none' : 'block';
       }
-      
-      const cardTypeDiv = document.getElementById(node.id).querySelector('.node-body div div');
-      if (cardTypeDiv) cardTypeDiv.innerText = node.data.extractorType;
     });
   }
   
   const extractPattern = document.getElementById('prop-extractor-pattern');
   if (extractPattern) {
     extractPattern.addEventListener('input', (e) => {
-      node.data.extractorPattern = e.target.value;
+      updateNodeData(node.id, 'extractorPattern', e.target.value);
     });
   }
 
@@ -356,16 +439,14 @@ function wirePropertyControls(node) {
   const condSelect = document.getElementById('prop-cond-type');
   if (condSelect) {
     condSelect.addEventListener('change', (e) => {
-      node.data.conditionType = e.target.value;
-      updateConditionPreview(node);
+      updateNodeData(node.id, 'conditionType', e.target.value);
     });
   }
   
   const condVal = document.getElementById('prop-cond-val');
   if (condVal) {
     condVal.addEventListener('input', (e) => {
-      node.data.conditionValue = e.target.value;
-      updateConditionPreview(node);
+      updateNodeData(node.id, 'conditionValue', e.target.value);
     });
   }
 
@@ -373,9 +454,7 @@ function wirePropertyControls(node) {
   const varInput = document.getElementById('prop-var-input');
   if (varInput) {
     varInput.addEventListener('input', (e) => {
-      node.data.variableName = e.target.value;
-      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="variableName"]');
-      if (inlineInput) inlineInput.value = node.data.variableName;
+      updateNodeData(node.id, 'variableName', e.target.value);
     });
   }
 
@@ -383,9 +462,7 @@ function wirePropertyControls(node) {
   const toolSelect = document.getElementById('prop-tool-type');
   if (toolSelect) {
     toolSelect.addEventListener('change', (e) => {
-      node.data.toolType = e.target.value;
-      const cardToolDiv = document.getElementById(node.id).querySelector('.node-body div div');
-      if (cardToolDiv) cardToolDiv.innerText = node.data.toolType;
+      updateNodeData(node.id, 'toolType', e.target.value);
     });
   }
 
@@ -393,17 +470,8 @@ function wirePropertyControls(node) {
   const outputInput = document.getElementById('prop-output-input');
   if (outputInput) {
     outputInput.addEventListener('input', (e) => {
-      node.data.outputLabel = e.target.value;
-      const inlineInput = document.getElementById(node.id).querySelector('.inline-edit[data-prop="outputLabel"]');
-      if (inlineInput) inlineInput.value = node.data.outputLabel;
+      updateNodeData(node.id, 'outputLabel', e.target.value);
     });
-  }
-}
-
-function updateConditionPreview(node) {
-  const cardDiv = document.getElementById(node.id).querySelector('.node-body div div');
-  if (cardDiv) {
-    cardDiv.innerText = `${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"`;
   }
 }
 
@@ -534,21 +602,8 @@ export function openPromptEditor(node) {
   });
 
   const saveAndClose = () => {
-    node.data.promptTemplate = textarea.value;
-    node.data.systemPrompt = systemTextarea.value;
-    
-    // Update inline card preview
-    const cardField = document.getElementById(node.id).querySelector('.node-body div div');
-    if (cardField) {
-      const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
-      cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
-    }
-    
-    // Update sidebar inspector if active
-    if (state.selectedNodeId === node.id) {
-      showNodeProperties(node.id);
-    }
-    
+    updateNodeData(node.id, 'promptTemplate', textarea.value);
+    updateNodeData(node.id, 'systemPrompt', systemTextarea.value);
     log(state.lang === 'en' ? 'Prompt template saved.' : 'プロンプトテンプレートを保存しました。', 'info');
     closeEditor();
   };
@@ -650,7 +705,7 @@ export function openPromptEditor(node) {
         modalTextarea.value = optimized.trim();
         log(state.lang === 'en' ? 'Prompt optimized inside editor.' : 'エディタ内でプロンプトの最適化を行いました。', 'success');
       } else {
-        node.data.promptTemplate = optimized.trim();
+        updateNodeData(node.id, 'promptTemplate', optimized.trim());
         log(state.lang === 'en' 
           ? `Background prompt optimization finished successfully for node: ${node.title}.` 
           : `ノード「${node.title}」のバックグラウンド プロンプト最適化が完了しました。`, 'success');
@@ -677,7 +732,7 @@ export function openPromptEditor(node) {
       } else {
         console.error('Refine failed:', e);
         log(`Optimization failed: ${e.message}`, 'error');
-        if (state.llmProvider === 'openai-compatible') showCorsErrorModal();
+        showCorsErrorModal();
       }
     } finally {
       isOptimizing = false;
@@ -823,5 +878,5 @@ export function initSettingsUI() {
   const key = document.getElementById('settings-api-key');
   if (key) key.value = state.apiKey || '';
 
-  updateLlmProvider(state.llmProvider);
+  updateLlmProviderUI(state.llmProvider);
 }

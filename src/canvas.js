@@ -1,7 +1,24 @@
 // Canvas Pan/Zoom Controls, Drag-and-Drop, Port Linkage, and Nodes Rendering
 'use strict';
 
-import { state, NODE_TYPES, NODE_COLORS, NODE_ICONS, PORT_TEMPLATES, TRANSLATIONS } from './state.js';
+import { 
+  state, 
+  NODE_TYPES, 
+  NODE_COLORS, 
+  NODE_ICONS, 
+  PORT_TEMPLATES, 
+  TRANSLATIONS,
+  getDefaultSystemPrompt,
+  addNode as modelAddNode,
+  deleteNode as modelDeleteNode,
+  updateNodePosition,
+  updateNodeSize,
+  updateNodeData,
+  setSelectedNode,
+  addLink,
+  deleteLink,
+  clearCanvasState
+} from './state.js';
 import { log, showNodeProperties, openPromptEditor } from './ui.js';
 
 export function updateCanvasTransform() {
@@ -95,17 +112,113 @@ export function initCanvasControls() {
 }
 
 /**
+ * Initialize reactive listeners for Model updates
+ */
+export function initCanvasListeners() {
+  state.on('nodeAdded', (newNode) => {
+    renderNode(newNode);
+    selectNode(newNode.id);
+    drawConnections();
+    log(state.lang === 'en' ? `Added ${newNode.type} node.` : `${newNode.title}ノードを作成しました。`, 'info');
+  });
+  
+  state.on('nodeDeleted', (nodeId) => {
+    const el = document.getElementById(nodeId);
+    if (el) el.remove();
+    log(state.lang === 'en' ? `Deleted node ${nodeId}.` : `ノードを削除しました。`, 'warning');
+  });
+  
+  state.on('nodeMoved', ({ id, x, y }) => {
+    const card = document.getElementById(id);
+    if (card) {
+      card.style.left = `${x}px`;
+      card.style.top = `${y}px`;
+    }
+  });
+  
+  state.on('nodeResized', ({ id, width, height }) => {
+    const card = document.getElementById(id);
+    if (card) {
+      card.style.width = `${width}px`;
+      card.style.height = `${height}px`;
+    }
+  });
+  
+  state.on('nodeDataChanged', ({ id, key, value, node }) => {
+    const card = document.getElementById(id);
+    if (!card) return;
+    
+    if (node.type === NODE_TYPES.START && key === 'inputValue') {
+      const inlineInput = card.querySelector('.inline-edit[data-prop="inputValue"]');
+      if (inlineInput) inlineInput.value = value;
+    } else if (node.type === NODE_TYPES.PROMPT && key === 'promptTemplate') {
+      const cardField = card.querySelector('.node-body div div');
+      if (cardField) {
+        const displayVal = value ? (value.substring(0, 30) + (value.length > 30 ? '...' : '')) : '';
+        cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+      }
+    } else if (node.type === NODE_TYPES.LLM && key === 'temperature') {
+      const tempDiv = card.querySelector('.node-body div div');
+      if (tempDiv) tempDiv.innerText = value;
+    } else if (node.type === NODE_TYPES.SET_VAR && key === 'variableName') {
+      const inlineInput = card.querySelector('.inline-edit[data-prop="variableName"]');
+      if (inlineInput) inlineInput.value = value;
+    } else if (node.type === NODE_TYPES.EXTRACTOR && key === 'extractorType') {
+      const cardTypeDiv = card.querySelector('.node-body div div');
+      if (cardTypeDiv) cardTypeDiv.innerText = value;
+    } else if (node.type === NODE_TYPES.CONDITION) {
+      const cardDiv = card.querySelector('.node-body div div');
+      if (cardDiv) {
+        cardDiv.innerText = `${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"`;
+      }
+    } else if (node.type === NODE_TYPES.TOOL && key === 'toolType') {
+      const cardToolDiv = card.querySelector('.node-body div div');
+      if (cardToolDiv) cardToolDiv.innerText = value;
+    } else if (node.type === NODE_TYPES.OUTPUT && key === 'outputLabel') {
+      const inlineInput = card.querySelector('.inline-edit[data-prop="outputLabel"]');
+      if (inlineInput) inlineInput.value = value;
+    }
+  });
+  
+  state.on('nodeTitleChanged', ({ id, title }) => {
+    const card = document.getElementById(id);
+    if (card) {
+      const cardTitleSpan = card.querySelector('.node-title span:last-child');
+      if (cardTitleSpan) cardTitleSpan.innerText = title;
+    }
+  });
+  
+  state.on('selectedNodeChanged', (nodeId) => {
+    document.querySelectorAll('.node-card').forEach(card => {
+      if (card.id === nodeId) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+    });
+    
+    if (nodeId) {
+      showNodeProperties(nodeId);
+    } else {
+      const propSection = document.getElementById('node-properties-section');
+      if (propSection) propSection.classList.add('collapsed');
+    }
+  });
+  
+  state.on('linksChanged', () => {
+    drawConnections();
+  });
+  
+  state.on('canvasCleared', () => {
+    document.getElementById('nodes-container').innerHTML = '';
+  });
+}
+
+/**
  * Clear canvas elements
  */
 export function clearCanvas() {
-  state.nodes = [];
-  state.links = [];
-  state.selectedNodeId = null;
-  document.getElementById('nodes-container').innerHTML = '';
-  drawConnections();
-  const propSection = document.getElementById('node-properties-section');
-  if (propSection) propSection.classList.add('collapsed');
-  log(state.lang === 'en' ? 'Canvas cleared.' : 'キャンバスを初期化しました。', 'warning');
+  clearCanvasState();
 }
 
 /**
@@ -249,10 +362,7 @@ function setupNodeEvents(cardEl, node) {
   cardEl.querySelectorAll('.inline-edit').forEach(input => {
     input.addEventListener('change', (e) => {
       const propName = e.target.getAttribute('data-prop');
-      node.data[propName] = e.target.value;
-      if (state.selectedNodeId === node.id) {
-        showNodeProperties(node.id); // Sync right side inspector
-      }
+      updateNodeData(node.id, propName, e.target.value);
     });
     
     // Prevent dragging node when typing inside inputs
@@ -261,7 +371,7 @@ function setupNodeEvents(cardEl, node) {
 
   // Delete Node button click
   cardEl.querySelector('.node-delete-btn').addEventListener('click', (e) => {
-    deleteNode(node.id);
+    modelDeleteNode(node.id);
     e.stopPropagation();
   });
 
@@ -333,17 +443,9 @@ export function initGlobalDragAndDrop() {
       const node = state.nodes.find(n => n.id === state.activeDraggingNodeId);
       if (node) {
         // Calculate new X,Y corrected by the viewport zoom scale!
-        node.x = (e.clientX - state.dragOffset.x) / state.zoom;
-        node.y = (e.clientY - state.dragOffset.y) / state.zoom;
-        
-        const card = document.getElementById(node.id);
-        if (card) {
-          card.style.left = `${node.x}px`;
-          card.style.top = `${node.y}px`;
-        }
-        
-        // Redraw SVG link wires
-        drawConnections();
+        const newX = (e.clientX - state.dragOffset.x) / state.zoom;
+        const newY = (e.clientY - state.dragOffset.y) / state.zoom;
+        updateNodePosition(node.id, newX, newY);
       }
     }
     
@@ -378,21 +480,13 @@ export function initGlobalDragAndDrop() {
     if (state.activeResizingNodeId) {
       const node = state.nodes.find(n => n.id === state.activeResizingNodeId);
       if (node) {
-        const card = document.getElementById(node.id);
         const dx = (e.clientX - state.resizeStartMouse.x) / state.zoom;
         const dy = (e.clientY - state.resizeStartMouse.y) / state.zoom;
         
         const newWidth = Math.max(200, state.resizeStartSize.width + dx);
         const newHeight = Math.max(120, state.resizeStartSize.height + dy);
         
-        node.width = newWidth;
-        node.height = newHeight;
-        
-        card.style.width = `${newWidth}px`;
-        card.style.height = `${newHeight}px`;
-        
-        // Redraw SVG link wires
-        drawConnections();
+        updateNodeSize(node.id, newWidth, newHeight);
       }
     }
   });
@@ -453,13 +547,8 @@ export function initGlobalDragAndDrop() {
           );
           
           if (!exists) {
-            // Remove previous connections connected to Flow Input port (Flow inputs usually accept only 1 incoming connection!)
-            // Data inputs can also accept only 1 incoming connection.
-            // Let's delete any existing links targeting (toPort) on (toNode)
-            state.links = state.links.filter(l => !(l.toNode === toNode && l.toPort === toPort));
-            
             const linkId = `link_${Date.now()}`;
-            state.links.push({
+            addLink({
               id: linkId,
               fromNode,
               fromPort,
@@ -467,9 +556,7 @@ export function initGlobalDragAndDrop() {
               toPort,
               type: sourceType
             });
-            
             log(state.lang === 'en' ? `Connected port ${fromPort} ➔ ${toPort}.` : `ポート接続を確立しました: ${fromPort} ➔ ${toPort}`, 'success');
-            drawConnections();
           }
         }
       }
@@ -500,29 +587,14 @@ export function initGlobalDragAndDrop() {
  * @param {string} nodeId Target Node ID
  */
 export function selectNode(nodeId) {
-  state.selectedNodeId = nodeId;
-  document.querySelectorAll('.node-card').forEach(card => {
-    if (card.id === nodeId) {
-      card.classList.add('selected');
-    } else {
-      card.classList.remove('selected');
-    }
-  });
-  
-  // Show properties panel
-  showNodeProperties(nodeId);
+  setSelectedNode(nodeId);
 }
 
 /**
  * Clear Node selections
  */
 export function deselectNodes() {
-  state.selectedNodeId = null;
-  document.querySelectorAll('.node-card').forEach(card => card.classList.remove('selected'));
-  
-  // Collapse property sidebar
-  const propSection = document.getElementById('node-properties-section');
-  if (propSection) propSection.classList.add('collapsed');
+  setSelectedNode(null);
 }
 
 /**
@@ -563,12 +635,7 @@ export function createNode(type, x, y) {
     }
   };
   
-  state.nodes.push(newNode);
-  renderNode(newNode);
-  selectNode(nodeId);
-  drawConnections();
-  
-  log(state.lang === 'en' ? `Added ${type} node.` : `${defaultTitle}ノードを作成しました。`, 'info');
+  modelAddNode(newNode);
   return newNode;
 }
 
@@ -577,20 +644,7 @@ export function createNode(type, x, y) {
  * @param {string} nodeId Target Node ID
  */
 export function deleteNode(nodeId) {
-  state.nodes = state.nodes.filter(n => n.id !== nodeId);
-  
-  // Remove links connected to this node
-  state.links = state.links.filter(l => l.fromNode !== nodeId && l.toNode !== nodeId);
-  
-  const el = document.getElementById(nodeId);
-  if (el) el.remove();
-  
-  if (state.selectedNodeId === nodeId) {
-    deselectNodes();
-  }
-  
-  drawConnections();
-  log(state.lang === 'en' ? `Deleted node ${nodeId}.` : `ノードを削除しました。`, 'warning');
+  modelDeleteNode(nodeId);
 }
 
 /**
@@ -663,10 +717,4 @@ export function drawConnections() {
     
     linksGroup.appendChild(path);
   });
-}
-
-export function deleteLink(linkId) {
-  state.links = state.links.filter(l => l.id !== linkId);
-  drawConnections();
-  log(state.lang === 'en' ? 'Link removed.' : '接続線を削除しました。', 'warning');
 }

@@ -1,7 +1,7 @@
 // LLM Provider Integrations (Chrome Built-in AI & OpenAI-compatible APIs)
 'use strict';
 
-import { state, getDefaultSystemPrompt } from './state.js';
+import { state, getDefaultSystemPrompt, setLlmProvider } from './state.js';
 import { log, showCorsErrorModal, showAlert, applyLanguage } from './ui.js';
 
 /**
@@ -110,30 +110,7 @@ export async function checkChromeAi() {
  * @param {string} provider 'chrome-ai' | 'openai-compatible'
  */
 export function updateLlmProvider(provider) {
-  state.llmProvider = provider;
-  localStorage.setItem('fabre_settings_llmProvider', provider);
-  const select = document.getElementById('settings-provider');
-  if (select) select.value = provider;
-  
-  const openaiBlock = document.getElementById('openai-settings-block');
-  const badgeText = document.getElementById('provider-badge-text');
-  const badgeContainer = document.getElementById('provider-badge');
-  
-  if (provider === 'openai-compatible') {
-    if (openaiBlock) openaiBlock.classList.remove('collapsed');
-    if (badgeContainer && badgeText) {
-      badgeContainer.className = 'status-badge info';
-      badgeText.innerText = 'LLM: Custom API';
-      badgeText.removeAttribute('data-i18n');
-    }
-  } else {
-    if (openaiBlock) openaiBlock.classList.add('collapsed');
-    if (badgeContainer && badgeText && state.chromeAiAvailable) {
-      badgeContainer.className = 'status-badge success';
-      badgeText.innerText = 'LLM: Chrome AI';
-      badgeText.removeAttribute('data-i18n');
-    }
-  }
+  setLlmProvider(provider);
 }
 
 /**

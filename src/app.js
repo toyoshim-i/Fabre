@@ -2,11 +2,34 @@
 // Module Entrypoint & Event Coordinator
 'use strict';
 
-import { state, NODE_TYPES } from './state.js';
+import { 
+  state, 
+  NODE_TYPES, 
+  setLanguage, 
+  setTheme, 
+  setLlmProvider, 
+  setApiEndpoint, 
+  setApiModel, 
+  setApiKey 
+} from './state.js';
 import { checkChromeAi, updateLlmProvider, fetchModels } from './llm.js';
 import { connectDirectory } from './file-system.js';
-import { initCanvasControls, initGlobalDragAndDrop, createNode, deselectNodes } from './canvas.js';
-import { log, applyLanguage, applyTheme, initTabs, initSettingsUI, updateVariablesUI } from './ui.js';
+import { 
+  initCanvasControls, 
+  initCanvasListeners, 
+  initGlobalDragAndDrop, 
+  createNode, 
+  deselectNodes 
+} from './canvas.js';
+import { 
+  log, 
+  applyLanguage, 
+  applyTheme, 
+  initTabs, 
+  initUiListeners, 
+  initSettingsUI, 
+  updateVariablesUI 
+} from './ui.js';
 
 function initEvents() {
   // Sidebar tabs nav
@@ -43,19 +66,16 @@ function initEvents() {
     if (input) {
       input.addEventListener('change', (e) => {
         if (id === 'settings-api-url') {
-          state.apiEndpoint = e.target.value;
-          localStorage.setItem('fabre_settings_apiEndpoint', e.target.value);
-          if (state.apiEndpoint.trim()) {
+          setApiEndpoint(e.target.value);
+          if (e.target.value.trim()) {
             fetchModels();
           }
         }
         if (id === 'settings-api-model') {
-          state.apiModel = e.target.value;
-          localStorage.setItem('fabre_settings_apiModel', e.target.value);
+          setApiModel(e.target.value);
         }
         if (id === 'settings-api-key') {
-          state.apiKey = e.target.value;
-          localStorage.setItem('fabre_settings_apiKey', e.target.value);
+          setApiKey(e.target.value);
         }
       });
     }
@@ -91,15 +111,13 @@ function initEvents() {
       const editorModal = document.getElementById('prompt-editor-modal');
       if (editorModal) {
         const textarea = document.getElementById('modal-prompt-textarea');
+        const systemTextarea = document.getElementById('modal-prompt-system-textarea');
         if (textarea && state.selectedNodeId) {
           const node = state.nodes.find(n => n.id === state.selectedNodeId);
           if (node) {
-            node.data.promptTemplate = textarea.value;
-            // Update node card preview on canvas
-            const cardField = document.getElementById(node.id).querySelector('.node-body div div');
-            if (cardField) {
-              const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
-              cardField.innerHTML = displayVal ? displayVal : '<i>Empty Template</i>';
+            updateNodeData(node.id, 'promptTemplate', textarea.value);
+            if (systemTextarea) {
+              updateNodeData(node.id, 'systemPrompt', systemTextarea.value);
             }
           }
         }
@@ -152,24 +170,26 @@ function initEvents() {
 
 // DomContentLoaded Initialization entrypoint
 document.addEventListener('DOMContentLoaded', () => {
-  // Load settings from localStorage
-  const savedLang = localStorage.getItem('fabre_settings_lang');
-  const savedTheme = localStorage.getItem('fabre_settings_theme');
-  const savedLlmProvider = localStorage.getItem('fabre_settings_llmProvider');
-  const savedApiEndpoint = localStorage.getItem('fabre_settings_apiEndpoint');
-  const savedApiModel = localStorage.getItem('fabre_settings_apiModel');
-  const savedApiKey = localStorage.getItem('fabre_settings_apiKey');
-  
-  if (savedLang) state.lang = savedLang;
-  if (savedTheme) state.theme = savedTheme;
-  if (savedLlmProvider) state.llmProvider = savedLlmProvider;
-  if (savedApiEndpoint) state.apiEndpoint = savedApiEndpoint;
-  if (savedApiModel) state.apiModel = savedApiModel;
-  if (savedApiKey) state.apiKey = savedApiKey;
+  // Initialize all reactive model-view observers first
+  initCanvasListeners();
+  initUiListeners();
 
-  // Set default theme and language
-  applyTheme(state.theme);
-  applyLanguage(state.lang);
+  // Load settings from localStorage
+  const savedLang = localStorage.getItem('fabre_settings_lang') || 'ja';
+  const savedTheme = localStorage.getItem('fabre_settings_theme') || 'theme-cyber-dark';
+  const savedLlmProvider = localStorage.getItem('fabre_settings_llmProvider') || 'chrome-ai';
+  const savedApiEndpoint = localStorage.getItem('fabre_settings_apiEndpoint') || 'http://localhost:11434/v1';
+  const savedApiModel = localStorage.getItem('fabre_settings_apiModel') || 'qwen2.5-coder:7b';
+  const savedApiKey = localStorage.getItem('fabre_settings_apiKey') || '';
+
+  // Hydrate global state via Mutators (triggers listeners automatically)
+  setLanguage(savedLang);
+  setTheme(savedTheme);
+  setLlmProvider(savedLlmProvider);
+  setApiEndpoint(savedApiEndpoint);
+  setApiModel(savedApiModel);
+  setApiKey(savedApiKey);
+
   initSettingsUI();
   
   log('Initializing Fabre v0.1.0 workspace...', 'info');
@@ -187,9 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
   createNode(NODE_TYPES.START, 100, 200);
   createNode(NODE_TYPES.OUTPUT, 600, 200);
   deselectNodes();
-  
-  // Initialize Variables Watching UI
-  updateVariablesUI();
   
   log('Workspace initialized. Ready to build agents.', 'success');
 });
