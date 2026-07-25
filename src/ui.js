@@ -12,9 +12,12 @@ import {
   updateNodeTitle,
   updateNodeData,
   setSelectedNode,
-  addLog
+  addLog,
+  setExecutionDelay
 } from './state.js';
 import { runLlmQuery } from './llm.js';
+import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow } from './runtime.js';
+import { drawConnections } from './canvas.js';
 
 /**
  * Standard log message wrapper delegating to Model Mutator
@@ -104,6 +107,83 @@ export function initUiListeners() {
   state.on('logAdded', (entry) => {
     renderLogEntry(entry);
   });
+
+  // 7. Runner State changes
+  state.on('runnerStateChanged', (runnerState) => {
+    updateRunnerUI(runnerState);
+  });
+
+  // 8. Current Node changes
+  state.on('currentNodeChanged', (nodeId) => {
+    updateCurrentNodeUI(nodeId);
+  });
+
+  // 9. Total Steps changes
+  state.on('totalStepsChanged', (totalSteps) => {
+    const stepsEl = document.getElementById('runner-steps-count');
+    if (stepsEl) stepsEl.innerText = totalSteps;
+  });
+}
+
+function updateRunnerUI(runnerState) {
+  const statusBadge = document.getElementById('runner-status-badge');
+  const statusText = document.getElementById('runner-status-text');
+  if (statusBadge && statusText) {
+    const t = TRANSLATIONS[state.lang];
+    const key = `status_${runnerState}`;
+    statusText.innerText = t[key] || runnerState.toUpperCase();
+    statusBadge.className = `status-badge ${runnerState === 'running' ? 'info' : (runnerState === 'success' ? 'success' : (runnerState === 'error' ? 'warning' : 'default'))}`;
+  }
+
+  const runBtn = document.getElementById('btn-run-workflow');
+  const stepBtn = document.getElementById('btn-step-workflow');
+  const pauseBtn = document.getElementById('btn-pause-workflow');
+
+  if (runBtn) runBtn.disabled = runnerState === 'running';
+  if (stepBtn) stepBtn.disabled = runnerState === 'running';
+  if (pauseBtn) pauseBtn.disabled = runnerState !== 'running';
+
+  drawConnections();
+}
+
+function updateCurrentNodeUI(nodeId) {
+  const nodeEl = document.getElementById('runner-current-node');
+  if (nodeEl) {
+    const node = state.nodes.find(n => n.id === nodeId);
+    nodeEl.innerText = node ? `${node.title} (${node.id})` : (state.lang === 'en' ? 'None' : 'なし');
+  }
+
+  document.querySelectorAll('.node-card').forEach(card => {
+    if (card.id === nodeId) {
+      card.classList.add('active-step');
+    } else {
+      card.classList.remove('active-step');
+    }
+  });
+}
+
+export function initRunnerControls() {
+  const runBtn = document.getElementById('btn-run-workflow');
+  if (runBtn) runBtn.addEventListener('click', runWorkflow);
+
+  const stepBtn = document.getElementById('btn-step-workflow');
+  if (stepBtn) stepBtn.addEventListener('click', stepWorkflow);
+
+  const pauseBtn = document.getElementById('btn-pause-workflow');
+  if (pauseBtn) pauseBtn.addEventListener('click', pauseWorkflow);
+
+  const resetBtn = document.getElementById('btn-reset-workflow');
+  if (resetBtn) resetBtn.addEventListener('click', resetWorkflow);
+
+  const delayInput = document.getElementById('runner-delay-input');
+  const delayLabel = document.getElementById('runner-delay-val');
+  if (delayInput) {
+    delayInput.addEventListener('input', (e) => {
+      const delay = parseInt(e.target.value, 10);
+      setExecutionDelay(delay);
+      if (delayLabel) delayLabel.innerText = `${delay}ms`;
+    });
+  }
 }
 
 /**

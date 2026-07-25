@@ -23,6 +23,11 @@ import {
   addLog,
   NODE_TYPES
 } from '../src/state.js';
+import { 
+  stepWorkflow, 
+  resetWorkflow, 
+  executeLocalTool 
+} from '../src/runtime.js';
 
 test('Model state mutations & events regression tests', async (t) => {
 
@@ -194,6 +199,53 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(entryText, 'Test log entry');
     assert.strictEqual(state.logs.length, 1);
     assert.strictEqual(state.logs[0].text, 'Test log entry');
+  });
+
+  await t.test('should evaluate workflow step and update runtime state', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    const startNode = {
+      id: 'node_start_1',
+      type: NODE_TYPES.START,
+      title: 'Start Node',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      data: { inputValue: 'Hello World' }
+    };
+    addNode(startNode);
+
+    let stateFired = false;
+    let stepCount = 0;
+
+    state.on('runnerStateChanged', () => { stateFired = true; });
+    state.on('totalStepsChanged', (val) => { stepCount = val; });
+
+    await stepWorkflow();
+
+    assert.strictEqual(state.currentNodeId, 'node_start_1');
+    assert.strictEqual(state.totalSteps, 1);
+    assert.strictEqual(stateFired, true);
+
+    resetWorkflow();
+    assert.strictEqual(state.runnerState, 'idle');
+    assert.strictEqual(state.currentNodeId, null);
+    assert.strictEqual(state.totalSteps, 0);
+  });
+
+  await t.test('should execute local tools cleanly', async () => {
+    setVariable('current_code', 'function foo() { return true; }');
+    const testResult = await executeLocalTool('mock_test', '');
+    assert.strictEqual(testResult.includes('PASS'), true);
+
+    setVariable('current_code', 'SyntaxError: Unexpected token');
+    const failResult = await executeLocalTool('mock_test', '');
+    assert.strictEqual(failResult.includes('FAILED'), true);
+
+    const sandboxResult = await executeLocalTool('js_sandbox', '1 + 2');
+    assert.strictEqual(sandboxResult, '3');
   });
 
 });

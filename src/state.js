@@ -200,6 +200,35 @@ export function addLog(text, type = 'info', details = null) {
   state.emit('logAdded', entry);
 }
 
+export function setRunnerState(runnerState) {
+  state.runnerState = runnerState;
+  state.emit('runnerStateChanged', runnerState);
+}
+
+export function setCurrentNodeId(nodeId) {
+  state.currentNodeId = nodeId;
+  state.emit('currentNodeChanged', nodeId);
+}
+
+export function setExecutionDelay(delay) {
+  state.executionDelay = delay;
+  state.emit('executionDelayChanged', delay);
+}
+
+export function incrementTotalSteps() {
+  state.totalSteps += 1;
+  state.emit('totalStepsChanged', state.totalSteps);
+}
+
+export function resetRunner() {
+  state.runnerState = 'idle';
+  state.currentNodeId = null;
+  state.totalSteps = 0;
+  state.emit('runnerStateChanged', 'idle');
+  state.emit('currentNodeChanged', null);
+  state.emit('totalStepsChanged', 0);
+}
+
 // ==========================================================================
 // Constants & Metadata Definitions
 // ==========================================================================

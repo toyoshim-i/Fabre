@@ -27,6 +27,7 @@ import {
   applyTheme, 
   initTabs, 
   initUiListeners, 
+  initRunnerControls,
   initSettingsUI, 
   updateVariablesUI 
 } from './ui.js';
@@ -34,6 +35,7 @@ import {
 function initEvents() {
   // Sidebar tabs nav
   initTabs();
+  initRunnerControls();
   
   // Language switcher
   const langSelect = document.getElementById('settings-language');
