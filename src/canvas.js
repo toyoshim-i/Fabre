@@ -133,6 +133,7 @@ export function initCanvasListeners() {
     if (card) {
       card.style.left = `${x}px`;
       card.style.top = `${y}px`;
+      drawConnections();
     }
   });
   
@@ -142,6 +143,7 @@ export function initCanvasListeners() {
       card.style.width = `${width}px`;
       card.style.minHeight = `${height}px`;
       card.style.height = 'auto';
+      drawConnections();
     }
   });
   
@@ -767,4 +769,33 @@ export function drawConnections() {
     
     linksGroup.appendChild(path);
   });
+}
+
+/**
+ * Update stream logs box inner HTML reactively without recreating card element
+ */
+export function updateStreamViewContent(node) {
+  if (typeof document === 'undefined') return;
+  const card = document.getElementById(node.id);
+  if (!card) return;
+
+  const box = card.querySelector('.stream-logs-box');
+  if (!box) return;
+
+  const logs = node.data.streamLogs || [];
+  let streamHtml = '';
+  if (logs.length === 0) {
+    streamHtml = `<p class="placeholder-text" style="font-size:10px;" data-i18n="stream_empty_placeholder">Stream timeline output will appear here...</p>`;
+  } else {
+    logs.forEach(msg => {
+      const isUser = msg.role === 'user';
+      streamHtml += `
+        <div style="font-size:10px; margin-bottom:4px; padding:4px 6px; border-radius:6px; background:${isUser ? 'rgba(56,189,248,0.15)' : 'rgba(139,92,246,0.15)'}; border:1px solid ${isUser ? 'rgba(56,189,248,0.3)' : 'rgba(139,92,246,0.3)'}">
+          <strong style="color:${isUser ? '#38bdf8' : '#a855f7'}">${isUser ? 'User' : 'Assistant'}:</strong> ${msg.text}
+        </div>
+      `;
+    });
+  }
+  box.innerHTML = streamHtml;
+  box.scrollTop = box.scrollHeight;
 }

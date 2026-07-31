@@ -20,6 +20,7 @@ import {
   clearCanvasState,
   setVariable,
   clearVariables,
+  resetRunner,
   addLog,
   NODE_TYPES
 } from '../src/state.js';
@@ -282,6 +283,40 @@ test('Model state mutations & events regression tests', async (t) => {
     await stepWorkflow(); // evaluates stream_view
     assert.strictEqual((streamNode.data.streamLogs || []).length, 1);
     assert.strictEqual(streamNode.data.streamLogs[0].text, 'Hello Event!');
+  });
+
+  await t.test('should accumulate multi-turn conversation history in set_var node', async () => {
+    clearCanvasState();
+    clearVariables();
+    resetRunner();
+    const waitNode = { id: 'ew1', type: 'event_wait', title: 'Event Wait', x: 0, y: 0, width: 200, height: 100, data: {} };
+    const promptNode = { id: 'pr1', type: 'prompt', title: 'Prompt Builder', x: 300, y: 0, width: 200, height: 100, data: { promptTemplate: 'History:\n{{chat_history}}\nUser: {{inputValue}}\nAssistant:' } };
+    const setVarNode = { id: 'sv1', type: 'set_var', title: 'Set Var History', x: 600, y: 0, width: 200, height: 100, data: { variableName: 'chat_history' } };
+
+    addNode(waitNode);
+    addNode(promptNode);
+    addNode(setVarNode);
+
+    addLink({ id: 'fl1', fromNode: 'ew1', fromPort: 'flow-out', toNode: 'pr1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'fl2', fromNode: 'pr1', fromPort: 'flow-out', toNode: 'sv1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'fl_loop', fromNode: 'sv1', fromPort: 'flow-out', toNode: 'ew1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l1', fromNode: 'ew1', fromPort: 'data-out', toNode: 'pr1', toPort: 'data-in', type: 'data' });
+    addLink({ id: 'l2', fromNode: 'pr1', fromPort: 'prompt-out', toNode: 'sv1', toPort: 'value-in', type: 'data' });
+
+    // Turn 1
+    state.nodes.find(n => n.id === 'ew1').data.pendingEventPayload = 'Turn 1 User Input';
+    await stepWorkflow(); // ew1 (processes event and moves to pr1)
+    await stepWorkflow(); // pr1 (compiles prompt and moves to sv1)
+    await stepWorkflow(); // sv1 (sets chat_history variable)
+    assert.strictEqual(Boolean(state.variables['chat_history'] && state.variables['chat_history'].includes('Turn 1 User Input')), true);
+
+    // Turn 2
+    state.nodes.find(n => n.id === 'ew1').data.pendingEventPayload = 'Turn 2 User Input';
+    await stepWorkflow(); // ew1
+    await stepWorkflow(); // pr1
+    const compiledPrompt = state.nodes.find(n => n.id === 'pr1').data.lastCompiledPrompt;
+    assert.strictEqual(Boolean(compiledPrompt && compiledPrompt.includes('Turn 1 User Input')), true);
+    assert.strictEqual(Boolean(compiledPrompt && compiledPrompt.includes('Turn 2 User Input')), true);
   });
 
 });

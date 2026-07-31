@@ -253,15 +253,20 @@ async function evaluateNode(node) {
 
     case NODE_TYPES.PROMPT: {
       let tmpl = node.data.promptTemplate || '';
-      // Direct Data Port Input fallback
       const portInput = getPortInputValue(node.id, 'data-in');
-      if (portInput && typeof portInput === 'string') {
+      if (!tmpl && portInput && typeof portInput === 'string') {
         tmpl = portInput;
       }
       
       // Inject variables: {{var_name}}
       outputValue = tmpl.replace(/\{\{\s*([a-zA-Z0-9_\-]+)\s*\}\}/g, (match, varName) => {
-        return state.variables[varName] !== undefined ? state.variables[varName] : match;
+        if (state.variables[varName] !== undefined) {
+          return state.variables[varName];
+        }
+        if ((varName === 'inputValue' || varName === 'input') && portInput !== null && portInput !== undefined) {
+          return portInput;
+        }
+        return '';
       });
       node.data.lastCompiledPrompt = outputValue;
       break;
@@ -367,9 +372,18 @@ async function evaluateNode(node) {
     case NODE_TYPES.SET_VAR: {
       const valIn = getPortInputValue(node.id, 'value-in') || '';
       const varName = node.data.variableName || 'temp_var';
-      setVariable(varName, valIn);
-      outputValue = valIn;
-      addLog(t('set_var_log', { name: varName, val: valIn }), 'success');
+      const isAppend = node.data.mode === 'append' || varName.toLowerCase().includes('history');
+      
+      let newValue = valIn;
+      if (isAppend) {
+        const lastInput = state.nodes.find(n => n.type === NODE_TYPES.EVENT_WAIT)?.data.lastEventValue || '';
+        const turnStr = valIn.startsWith('User:') ? valIn : `User: ${lastInput}\nAssistant: ${valIn}\n\n`;
+        newValue = (state.variables[varName] ? state.variables[varName] : '') + turnStr;
+      }
+      
+      setVariable(varName, newValue);
+      outputValue = newValue;
+      addLog(t('set_var_log', { name: varName, val: newValue }), 'success');
       break;
     }
 
@@ -396,18 +410,36 @@ async function evaluateNode(node) {
 
     case NODE_TYPES.STREAM_VIEW: {
       const textIn = getPortInputValue(node.id, 'text-in') || '';
-      const roleIn = getPortInputValue(node.id, 'role-in') || (textIn.startsWith('User:') ? 'user' : 'assistant');
+      let roleIn = getPortInputValue(node.id, 'role-in');
       
       if (textIn) {
-        if (!node.data.streamLogs) node.data.streamLogs = [];
-        node.data.streamLogs.push({ role: roleIn, text: textIn, timestamp: new Date().toISOString() });
-        outputValue = textIn;
-        
-        // Re-render node card on canvas
-        const cardEl = document.getElementById(node.id);
-        if (cardEl) {
-          import('./canvas.js').then(m => m.renderNode(node));
+        let displayText = textIn;
+        let displayRole = roleIn;
+
+        // Generic JSON / OpenAI response decoding fallback
+        try {
+          const parsed = JSON.parse(textIn);
+          if (parsed.choices && parsed.choices[0] && parsed.choices[0].message) {
+            displayText = parsed.choices[0].message.content || displayText;
+            displayRole = parsed.choices[0].message.role || displayRole || 'assistant';
+          } else if (parsed.text || parsed.content) {
+            displayText = parsed.text || parsed.content;
+            if (parsed.role) displayRole = parsed.role;
+          }
+        } catch (e) {
+          // Plain text format
         }
+
+        if (!displayRole) {
+          displayRole = displayText.startsWith('User:') ? 'user' : 'assistant';
+        }
+
+        if (!node.data.streamLogs) node.data.streamLogs = [];
+        node.data.streamLogs.push({ role: displayRole, text: displayText, timestamp: new Date().toISOString() });
+        outputValue = displayText;
+        
+        // Update stream timeline view cleanly without re-creating DOM element
+        import('./canvas.js').then(m => m.updateStreamViewContent(node));
       }
       break;
     }
