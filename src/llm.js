@@ -200,6 +200,62 @@ export async function fetchModels() {
 }
 
 /**
+ * Convert raw string, prompt, or structured object array into Fabre Canonical Messages
+ * Schema: [ { role: 'system'|'user'|'assistant'|'tool', content: string, tool_name?: string } ]
+ */
+export function normalizeToCanonicalMessages(input, systemPrompt = '') {
+  let messages = [];
+
+  if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim()) {
+    messages.push({ role: 'system', content: systemPrompt.trim() });
+  }
+
+  if (Array.isArray(input)) {
+    input.forEach(item => {
+      if (typeof item === 'string') {
+        messages.push({ role: 'user', content: item });
+      } else if (item && typeof item === 'object' && item.content) {
+        messages.push({
+          role: item.role || 'user',
+          content: String(item.content),
+          ...(item.tool_name ? { tool_name: item.tool_name } : {})
+        });
+      }
+    });
+  } else if (typeof input === 'string') {
+    const trimmed = input.trim();
+    // Check if input is a JSON string of Canonical Messages array
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return normalizeToCanonicalMessages(parsed, systemPrompt);
+        }
+      } catch (e) {}
+    }
+
+    // Check if input contains multi-turn "User: ... \n Assistant: ..." role annotations
+    if (trimmed.includes('User:') || trimmed.includes('Assistant:')) {
+      const parts = trimmed.split(/(?=User:|Assistant:)/i);
+      parts.forEach(part => {
+        const p = part.trim();
+        if (p.toLowerCase().startsWith('user:')) {
+          messages.push({ role: 'user', content: p.replace(/^user:/i, '').trim() });
+        } else if (p.toLowerCase().startsWith('assistant:')) {
+          messages.push({ role: 'assistant', content: p.replace(/^assistant:/i, '').trim() });
+        } else if (p) {
+          messages.push({ role: 'user', content: p });
+        }
+      });
+    } else if (trimmed) {
+      messages.push({ role: 'user', content: trimmed });
+    }
+  }
+
+  return messages;
+}
+
+/**
  * Execute an LLM query string and wait for response
  * @param {string} systemPrompt System Instructions
  * @param {string} userPrompt User Prompt
@@ -209,46 +265,47 @@ export async function fetchModels() {
  */
 export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null) {
   let responseContent = '';
-  console.log(`[LLM Query Request] Provider: ${state.llmProvider}`);
+  const canonicalMessages = normalizeToCanonicalMessages(userPrompt, systemPrompt);
+
   if (state.llmProvider === 'chrome-ai') {
-    const aiModel = window.ai && (window.ai.languageModel || window.ai.assistant);
-    if (!state.chromeAiAvailable || !window.ai || !aiModel) {
-      throw new Error(state.lang === 'en' 
-        ? 'Chrome Built-in AI is not available. Please verify capability flags or select External API.'
-        : 'Chrome 組み込み AI が利用できません。フラグが有効化されているか確認するか、外部APIを選択してください。');
+    const aiModel = getChromeAiInterface();
+    if (!aiModel || !state.chromeAiAvailable) {
+      throw new Error(state.lang === 'en' ? 'Chrome Built-in AI is not available or enabled.' : 'Chrome 組み込み AI が利用不可または無効です。');
     }
-
-    console.log(`[Chrome AI Settings] Temperature: ${temperature}`);
-    console.log(`[Chrome AI System Prompt]\n`, systemPrompt);
-    console.log(`[Chrome AI User Prompt]\n`, userPrompt);
-
-    log(
-      state.lang === 'en'
-        ? `Sending query via Chrome Built-in AI...`
-        : `Chrome 組み込み AI 経由でクエリを送信中...`,
-      'info',
-      `[API Engine] Chrome Built-in AI (window.ai)
-[System Prompt]
-${systemPrompt}
-
-[User Prompt]
-${userPrompt}
-
-[Temperature]
-${temperature}`
-    );
     
-    // Create new session with system prompt instructions
-    const session = await aiModel.create({
-      systemPrompt: systemPrompt,
-      temperature: temperature,
-      signal: signal
-    });
+    // Create new LanguageModel session for isolation
+    const sessionOptions = { temperature: temperature };
+    if (systemPrompt) {
+      sessionOptions.systemPrompt = systemPrompt;
+    }
+    
+    log(state.lang === 'en' ? 'Executing query via Chrome Built-in AI (Gemini Nano)...' : 'Chrome 組み込み AI (Gemini Nano) でクエリを実行中...', 'info');
+    
+    let session;
+    if (typeof aiModel.create === 'function') {
+      session = await aiModel.create(sessionOptions);
+    } else {
+      // Direct session instantiation fallback
+      session = await aiModel(sessionOptions);
+    }
     
     try {
-      responseContent = await session.prompt(userPrompt, { signal });
+      const promptText = canonicalMessages
+        .filter(m => m.role !== 'system')
+        .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+        .join('\n\n');
+
+      if (typeof session.prompt === 'function') {
+        responseContent = await session.prompt(promptText || String(userPrompt));
+      } else if (typeof session.execute === 'function') {
+        responseContent = await session.execute(promptText || String(userPrompt));
+      } else {
+        throw new Error('Unsupported Chrome AI session API version.');
+      }
     } finally {
-      session.destroy(); // Always cleanup sessions
+      if (session && typeof session.destroy === 'function') {
+        session.destroy(); // Always cleanup sessions
+      }
     }
   } else {
     // External OpenAI-compatible API call
@@ -275,8 +332,8 @@ ${temperature}`
     // 3. Fallback default 'qwen2.5-coder:7b'
     let selectedModel = state.apiModel ? state.apiModel.trim() : '';
     if (!selectedModel) {
-      const datalist = document.getElementById('settings-model-datalist');
-      if (datalist && datalist.options.length > 0) {
+      const datalist = document.getElementById ? document.getElementById('settings-model-datalist') : null;
+      if (datalist && datalist.options && datalist.options.length > 0) {
         selectedModel = datalist.options[0].value;
       } else {
         selectedModel = 'qwen2.5-coder:7b';
@@ -285,10 +342,7 @@ ${temperature}`
     
     const body = {
       model: selectedModel,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
+      messages: canonicalMessages.map(m => ({ role: m.role, content: m.content })),
       temperature: temperature
     };
 
@@ -299,8 +353,7 @@ ${temperature}`
 
     console.log(`[External API Endpoint] POST ${endpoint}/chat/completions`);
     console.log(`[External API Headers]`, loggedHeaders);
-    console.log(`[External API System Prompt]\n`, systemPrompt);
-    console.log(`[External API User Prompt]\n`, userPrompt);
+    console.log(`[Canonical Messages]`, canonicalMessages);
     console.log(`[External API Request Body]`, body);
 
     log(

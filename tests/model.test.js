@@ -319,4 +319,34 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(Boolean(compiledPrompt && compiledPrompt.includes('Turn 2 User Input')), true);
   });
 
+  await t.test('should normalize raw strings and arrays into Fabre Canonical Messages', async () => {
+    const { normalizeToCanonicalMessages } = await import('../src/llm.js');
+    
+    // 1. Raw string input with system prompt
+    const msgs1 = normalizeToCanonicalMessages('Hello World', 'You are AI.');
+    assert.strictEqual(msgs1.length, 2);
+    assert.strictEqual(msgs1[0].role, 'system');
+    assert.strictEqual(msgs1[1].role, 'user');
+    assert.strictEqual(msgs1[1].content, 'Hello World');
+
+    // 2. Multi-turn text input
+    const multiTurnText = 'User: Hi\nAssistant: Hello!\nUser: How are you?';
+    const msgs2 = normalizeToCanonicalMessages(multiTurnText, 'System Prompt');
+    assert.strictEqual(msgs2.length, 4);
+    assert.strictEqual(msgs2[1].role, 'user');
+    assert.strictEqual(msgs2[1].content, 'Hi');
+    assert.strictEqual(msgs2[2].role, 'assistant');
+    assert.strictEqual(msgs2[2].content, 'Hello!');
+
+    // 3. Structured Array Input
+    const rawArray = [
+      { role: 'user', content: 'Turn 1' },
+      { role: 'assistant', content: 'Reply 1' }
+    ];
+    const msgs3 = normalizeToCanonicalMessages(rawArray);
+    assert.strictEqual(msgs3.length, 2);
+    assert.strictEqual(msgs3[0].role, 'user');
+    assert.strictEqual(msgs3[1].role, 'assistant');
+  });
+
 });

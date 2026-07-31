@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "meta": {
     "title": "End-to-End Infinite Chat",
-    "description": "Event-driven interactive chat workflow using Event Wait and Stream View nodes with a visual feedback loop.",
+    "description": "Event-driven interactive chat workflow using Event Wait, Prompt Builder, LLM Call, and Stream View nodes.",
     "author": "Fabre Team",
     "createdAt": "2026-07-31T13:00:00.000Z",
     "updatedAt": "2026-07-31T13:00:00.000Z"
