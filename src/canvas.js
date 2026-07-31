@@ -656,10 +656,10 @@ export function deleteNode(nodeId) {
  */
 export function getPortCenter(nodeId, portId) {
   const nodeEl = document.getElementById(nodeId);
-  if (!nodeEl) return { x: 0, y: 0 };
+  if (!nodeEl) return null;
   
   const portEl = nodeEl.querySelector(`[data-port-id="${portId}"]`);
-  if (!portEl) return { x: 0, y: 0 };
+  if (!portEl) return null;
   
   const canvasEl = document.getElementById('node-canvas');
   const portRect = portEl.getBoundingClientRect();
@@ -684,6 +684,7 @@ export function drawConnections() {
   state.links.forEach(link => {
     const start = getPortCenter(link.fromNode, link.fromPort);
     const end = getPortCenter(link.toNode, link.toPort);
+    if (!start || !end) return;
     
     // Draw smooth cubic bezier
     const dx = Math.abs(end.x - start.x);

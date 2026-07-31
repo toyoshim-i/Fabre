@@ -312,7 +312,8 @@ export const PORT_TEMPLATES = {
     ],
     outputs: [
       { id: 'flow-true', name: 'True', type: 'flow' },
-      { id: 'flow-false', name: 'False', type: 'flow' }
+      { id: 'flow-false', name: 'False', type: 'flow' },
+      { id: 'data-out', name: 'Data', type: 'data' }
     ]
   },
   set_var: {
@@ -321,7 +322,8 @@ export const PORT_TEMPLATES = {
       { id: 'value-in', name: 'Value', type: 'data' }
     ],
     outputs: [
-      { id: 'flow-out', name: 'Next', type: 'flow' }
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'value-out', name: 'Value', type: 'data' }
     ]
   },
   tool: {

@@ -164,6 +164,13 @@ function getSourceNodeOutputValue(sourceNode, portId) {
   if (sourceNode.type === NODE_TYPES.TOOL) {
     return sourceNode.data.lastToolResult || '';
   }
+  if (sourceNode.type === NODE_TYPES.SET_VAR) {
+    const valIn = getPortInputValue(sourceNode.id, 'value-in');
+    return valIn !== null ? valIn : (state.variables[sourceNode.data.variableName] || '');
+  }
+  if (sourceNode.type === NODE_TYPES.CONDITION) {
+    return getPortInputValue(sourceNode.id, 'text-in') || '';
+  }
   return '';
 }
 
