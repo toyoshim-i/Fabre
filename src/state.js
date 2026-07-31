@@ -35,6 +35,7 @@ export const state = {
   logs: [],
   totalSteps: 0,
   recentFiles: [],
+  chatMessages: [],
   
   // Local File Access
   directoryHandle: null,
@@ -232,6 +233,40 @@ export function resetRunner() {
 
 export const DEFAULT_RECENT_FILES = [
   {
+    id: 'sample_chat_e2e',
+    title: 'End-to-End Infinite Chat',
+    description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'End-to-End Infinite Chat',
+        description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Input Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'What is WebAssembly?' } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Memory Prompt Builder', x: 370, y: 160, width: 310, height: 170, data: { promptTemplate: 'Conversation History:\n{{chat_history}}\n\nUser Input: {{inputValue}}\nAssistant Reply:' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 730, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are Fabre AI, a helpful software engineer assistant.', temperature: 0.7 } },
+        { id: 'node_setvar_1', type: 'set_var', title: 'Update Chat Memory', x: 1060, y: 160, width: 250, height: 170, data: { variableName: 'chat_history' } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Conversation Timeline', x: 1360, y: 160, width: 280, height: 220, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f5', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
+      ],
+      variables: { chat_history: '' }
+    }
+  },
+  {
     id: 'sample_loop',
     title: 'Self-Debugging Agent Loop',
     description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
@@ -364,40 +399,64 @@ export function removeRecentFile(id) {
   state.emit('recentFilesChanged', state.recentFiles);
 }
 
+export function addChatMessage(role, text) {
+  const msg = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    role, // 'user' | 'assistant'
+    text,
+    timestamp: new Date().toISOString()
+  };
+  state.chatMessages.push(msg);
+  state.emit('chatMessagesChanged', state.chatMessages);
+  return msg;
+}
+
+export function clearChatMessages() {
+  state.chatMessages = [];
+  setVariable('chat_history', '');
+  state.emit('chatMessagesChanged', state.chatMessages);
+}
+
 // ==========================================================================
 // Constants & Metadata Definitions
 // ==========================================================================
 
 export const NODE_TYPES = {
   START: 'start',
+  EVENT_WAIT: 'event_wait',
   PROMPT: 'prompt',
   LLM: 'llm',
   EXTRACTOR: 'extractor',
   CONDITION: 'condition',
   SET_VAR: 'set_var',
   TOOL: 'tool',
+  STREAM_VIEW: 'stream_view',
   OUTPUT: 'output'
 };
 
 export const NODE_COLORS = {
   start: 'var(--color-start)',
+  event_wait: '#06b6d4',
   prompt: 'var(--color-prompt)',
   llm: 'var(--color-llm)',
   extractor: 'var(--color-extractor)',
   condition: 'var(--color-condition)',
   set_var: 'var(--color-setvar)',
   tool: 'var(--color-tool)',
+  stream_view: '#8b5cf6',
   output: 'var(--color-output)'
 };
 
 export const NODE_ICONS = {
   start: '▶',
+  event_wait: '⚡',
   prompt: '✎',
   llm: '🤖',
   extractor: '⚲',
   condition: '⇅',
   set_var: '⛃',
   tool: '🛠',
+  stream_view: '💬',
   output: '■'
 };
 
@@ -407,6 +466,15 @@ export const PORT_TEMPLATES = {
     outputs: [
       { id: 'flow-out', name: 'Start', type: 'flow' },
       { id: 'data-out', name: 'Input', type: 'data' }
+    ]
+  },
+  event_wait: {
+    inputs: [
+      { id: 'flow-in', name: 'Wait', type: 'flow' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Submit', type: 'flow' },
+      { id: 'data-out', name: 'Event Data', type: 'data' }
     ]
   },
   prompt: {
@@ -469,6 +537,17 @@ export const PORT_TEMPLATES = {
     outputs: [
       { id: 'flow-out', name: 'Next', type: 'flow' },
       { id: 'output-out', name: 'Result', type: 'data' }
+    ]
+  },
+  stream_view: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'text-in', name: 'Text', type: 'data' },
+      { id: 'role-in', name: 'Role', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'text-out', name: 'Text', type: 'data' }
     ]
   },
   output: {

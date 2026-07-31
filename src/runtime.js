@@ -10,7 +10,8 @@ import {
   setRunnerState,
   setCurrentNodeId,
   incrementTotalSteps,
-  resetRunner
+  resetRunner,
+  addChatMessage
 } from './state.js';
 import { runLlmQuery } from './llm.js';
 import { t } from './i18n.js';
@@ -50,6 +51,11 @@ export async function stepWorkflow() {
     incrementTotalSteps();
 
     // Determine outgoing flow port
+    if (result.nextFlowPort === null) {
+      setRunnerState('paused');
+      return;
+    }
+
     const nextFlowPort = result.nextFlowPort || 'flow-out';
     const nextLink = state.links.find(l => l.fromNode === currentNode.id && l.fromPort === nextFlowPort);
 
@@ -126,6 +132,67 @@ export function resetWorkflow() {
 }
 
 /**
+ * Execute an interactive End-to-End Chat Turn:
+ * 1. Appends User message to Chat history
+ * 2. Injects User message into Start Node
+ * 3. Runs the workflow steps continuously until completion
+ * 4. Appends final Output result to Chat history
+ */
+export async function runChatTurn(userMessage) {
+  if (!userMessage || !userMessage.trim()) return;
+
+  const trimmed = userMessage.trim();
+
+  // 1. Record User Message
+  addChatMessage('user', trimmed);
+
+  // 2. Locate Start Node and set input value
+  const startNode = state.nodes.find(n => n.type === NODE_TYPES.START) || state.nodes[0];
+  if (startNode) {
+    startNode.data.inputValue = trimmed;
+    setCurrentNodeId(startNode.id);
+  }
+
+  // 3. Reset runner state to running
+  setRunnerState('running');
+
+  // 4. Run step loop until workflow reaches Output or stops
+  let lastOutputResult = '';
+  while (state.runnerState === 'running' || state.runnerState === 'paused') {
+    const currentNode = state.nodes.find(n => n.id === state.currentNodeId);
+    if (!currentNode) break;
+
+    const isOutputNode = currentNode.type === NODE_TYPES.OUTPUT;
+    await stepWorkflow();
+
+    if (isOutputNode) {
+      const resultIn = getPortInputValue(currentNode.id, 'text-in');
+      if (resultIn) {
+        lastOutputResult = resultIn;
+      }
+      break;
+    }
+
+    if (state.runnerState === 'error' || state.runnerState === 'success') {
+      break;
+    }
+
+    // Brief delay between steps to visualize signal flow on canvas
+    await new Promise(r => setTimeout(r, Math.min(100, state.executionDelay)));
+    setRunnerState('running');
+  }
+
+  // 5. If Output Node emitted a reply, record Assistant Message & update memory
+  if (lastOutputResult) {
+    addChatMessage('assistant', lastOutputResult);
+    
+    // Accumulate conversation memory into chat_history variable
+    const history = (state.variables['chat_history'] || '') + `User: ${trimmed}\nAssistant: ${lastOutputResult}\n\n`;
+    setVariable('chat_history', history);
+  }
+}
+
+/**
  * Resolve data input for a given node port by following incoming links
  */
 export function getPortInputValue(nodeId, portId) {
@@ -142,6 +209,9 @@ export function getPortInputValue(nodeId, portId) {
 function getSourceNodeOutputValue(sourceNode, portId) {
   if (sourceNode.type === NODE_TYPES.START) {
     return sourceNode.data.inputValue || '';
+  }
+  if (sourceNode.type === NODE_TYPES.EVENT_WAIT) {
+    return sourceNode.data.lastEventValue || '';
   }
   if (sourceNode.type === NODE_TYPES.PROMPT) {
     return sourceNode.data.lastCompiledPrompt || sourceNode.data.promptTemplate || '';
@@ -160,6 +230,9 @@ function getSourceNodeOutputValue(sourceNode, portId) {
     return valIn !== null ? valIn : (state.variables[sourceNode.data.variableName] || '');
   }
   if (sourceNode.type === NODE_TYPES.CONDITION) {
+    return getPortInputValue(sourceNode.id, 'text-in') || '';
+  }
+  if (sourceNode.type === NODE_TYPES.STREAM_VIEW) {
     return getPortInputValue(sourceNode.id, 'text-in') || '';
   }
   return '';
@@ -308,6 +381,37 @@ async function evaluateNode(node) {
       break;
     }
 
+    case NODE_TYPES.EVENT_WAIT: {
+      if (!node.data.pendingEventPayload) {
+        setRunnerState('paused');
+        addLog(state.lang === 'en' ? `Node [${node.title}] is waiting for event input...` : `ノード [${node.title}] はイベント入力を待機しています...`, 'warning');
+        return { nextFlowPort: null, outputValue: '' };
+      }
+      outputValue = node.data.pendingEventPayload;
+      node.data.lastEventValue = outputValue;
+      delete node.data.pendingEventPayload;
+      addLog(state.lang === 'en' ? `Received event input on [${node.title}]: ${outputValue}` : `イベント入力を受領 [${node.title}]: ${outputValue}`, 'info');
+      break;
+    }
+
+    case NODE_TYPES.STREAM_VIEW: {
+      const textIn = getPortInputValue(node.id, 'text-in') || '';
+      const roleIn = getPortInputValue(node.id, 'role-in') || (textIn.startsWith('User:') ? 'user' : 'assistant');
+      
+      if (textIn) {
+        if (!node.data.streamLogs) node.data.streamLogs = [];
+        node.data.streamLogs.push({ role: roleIn, text: textIn, timestamp: new Date().toISOString() });
+        outputValue = textIn;
+        
+        // Re-render node card on canvas
+        const cardEl = document.getElementById(node.id);
+        if (cardEl) {
+          import('./canvas.js').then(m => m.renderNode(node));
+        }
+      }
+      break;
+    }
+
     case NODE_TYPES.OUTPUT: {
       const resultIn = getPortInputValue(node.id, 'text-in') || '';
       outputValue = resultIn;
@@ -316,6 +420,22 @@ async function evaluateNode(node) {
   }
 
   return { nextFlowPort, outputValue };
+}
+
+/**
+ * Trigger an event payload on an Event Wait Node and resume workflow execution
+ */
+export async function triggerNodeEvent(nodeId, text) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+
+  node.data.pendingEventPayload = text;
+  node.data.lastEventValue = text;
+  setCurrentNodeId(node.id);
+  
+  addLog(state.lang === 'en' ? `Event triggered on [${node.title}]` : `イベントを送信しました [${node.title}]`, 'info');
+  
+  runWorkflow();
 }
 
 /**

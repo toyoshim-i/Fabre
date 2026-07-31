@@ -19,20 +19,32 @@ export const DICTIONARY = {
   palette_title: { en: 'Palette', ja: 'パレット' },
   palette_subtitle: { en: 'Drag or Click to Add', ja: 'ドラッグまたはクリックで追加' },
   node_start: { en: 'Start Node', ja: '開始ノード' },
+  node_event_wait: { en: 'Event Wait', ja: 'イベント待機・受領' },
   node_prompt: { en: 'Prompt Builder', ja: 'プロンプト作成' },
   node_llm: { en: 'LLM Call', ja: 'LLM実行' },
   node_extractor: { en: 'Extractor', ja: '情報抽出' },
   node_condition: { en: 'Condition', ja: '条件分岐' },
   node_set_var: { en: 'Set Var', ja: '変数代入' },
   node_tool: { en: 'Tool Exec', ja: 'ツール実行' },
+  node_stream_view: { en: 'Stream View', ja: '出力ストリーム表示' },
   node_output: { en: 'Output Node', ja: '出力ノード' },
+  btn_send_event: { en: 'Send Event', ja: 'イベント送信' },
+  event_wait_placeholder: { en: 'Type event payload...', ja: 'イベントデータ・入力テキスト...' },
+  stream_empty_placeholder: { en: 'Stream timeline output will appear here...', ja: '出力ストリームがここに表示されます...' },
 
   // Sidebar Tabs
+  tab_chat: { en: 'Chat', ja: '対話デモ' },
   tab_runner: { en: 'Runner', ja: '実行制御' },
   tab_files: { en: 'Files', ja: 'ファイル' },
   tab_memory: { en: 'Memory', ja: '変数メモリ' },
   tab_logs: { en: 'Logs', ja: 'ログ・履歴' },
   tab_config: { en: 'Config', ja: '設定' },
+
+  // Chat Tab
+  chat_title: { en: 'Interactive Agent Chat', ja: '対話型エージェントチャット' },
+  chat_placeholder: { en: 'Type a message to run workflow...', ja: 'メッセージを入力して送信...' },
+  btn_send: { en: 'Send', ja: '送信' },
+  chat_empty_prompt: { en: 'Send a message to start continuous conversation with the workflow agent.', ja: 'メッセージを送信するとワークフローがリアルタイム実行されます。' },
 
   // Execution Debugger Controls
   runner_control_title: { en: 'Execution Control', ja: 'ワークフロー実行制御' },

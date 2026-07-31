@@ -259,4 +259,29 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(translate('workflow_completed', { result: 'OK' }), 'Workflow execution completed successfully. Result: OK');
   });
 
+  await t.test('should handle event_wait and stream_view node evaluation in loop', async () => {
+    clearCanvasState();
+    const waitNode = { id: 'ew1', type: 'event_wait', title: 'Event Wait', x: 0, y: 0, width: 200, height: 100, data: {} };
+    const streamNode = { id: 'sv1', type: 'stream_view', title: 'Stream View', x: 300, y: 0, width: 200, height: 100, data: {} };
+    addNode(waitNode);
+    addNode(streamNode);
+
+    addLink({ id: 'l1', fromNode: 'ew1', fromPort: 'flow-out', toNode: 'sv1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l2', fromNode: 'ew1', fromPort: 'data-out', toNode: 'sv1', toPort: 'text-in', type: 'data' });
+
+    // 1. First step on event_wait without payload pauses in waiting state
+    await stepWorkflow();
+    assert.strictEqual(state.runnerState, 'paused');
+
+    // 2. Inject event payload on waitNode
+    waitNode.data.pendingEventPayload = 'Hello Event!';
+    await stepWorkflow(); // evaluates event_wait
+    assert.strictEqual(waitNode.data.lastEventValue, 'Hello Event!');
+
+    // 3. Step to stream_view
+    await stepWorkflow(); // evaluates stream_view
+    assert.strictEqual((streamNode.data.streamLogs || []).length, 1);
+    assert.strictEqual(streamNode.data.streamLogs[0].text, 'Hello Event!');
+  });
+
 });

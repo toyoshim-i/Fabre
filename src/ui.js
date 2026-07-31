@@ -17,6 +17,7 @@ import {
   initRecentFiles,
   addRecentFile,
   removeRecentFile,
+  clearChatMessages,
   updateNodeTitle,
   updateNodeData,
   setSelectedNode,
@@ -24,7 +25,7 @@ import {
   setExecutionDelay
 } from './state.js';
 import { runLlmQuery } from './llm.js';
-import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow } from './runtime.js';
+import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow, runChatTurn } from './runtime.js';
 import { drawConnections } from './canvas.js';
 import { t, updateDomTranslations } from './i18n.js';
 

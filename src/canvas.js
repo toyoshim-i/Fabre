@@ -254,9 +254,16 @@ export function renderNode(node) {
     <div class="node-body">
   `;
 
-  // Custom visual previews inside node card based on type
   if (node.type === NODE_TYPES.START) {
     html += `<div class="node-field-group"><label data-i18n="prop_start_val">Input Value</label><input type="text" class="node-input-text inline-edit" data-prop="inputValue" value="${node.data.inputValue || ''}" placeholder="Initial input text..."></div>`;
+  } else if (node.type === NODE_TYPES.EVENT_WAIT) {
+    html += `
+      <div class="node-field-group">
+        <label data-i18n="node_event_wait">Event Wait</label>
+        <input type="text" class="node-input-text inline-edit" data-prop="eventInput" value="${node.data.lastEventValue || ''}" data-i18n-placeholder="event_wait_placeholder" placeholder="Type event payload...">
+        <button class="btn btn-primary btn-xs send-event-btn" style="margin-top: 6px; width: 100%; font-size: 10px;" data-i18n="btn_send_event">Send Event</button>
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.PROMPT) {
     const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
     html += `<div class="node-field-group"><label data-i18n="prop_prompt_tmpl">Prompt Template</label><div style="font-family: var(--font-mono); font-size:10px; color:var(--text-muted); min-height:16px;">${displayVal || '<i>Empty Template</i>'}</div></div>`;
@@ -270,6 +277,29 @@ export function renderNode(node) {
     html += `<div class="node-field-group"><label data-i18n="prop_cond_type">Rule</label><div>${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"</div></div>`;
   } else if (node.type === NODE_TYPES.TOOL) {
     html += `<div class="node-field-group"><label data-i18n="prop_tool_type">Tool</label><div>${node.data.toolType || 'mock_test'}</div></div>`;
+  } else if (node.type === NODE_TYPES.STREAM_VIEW) {
+    const logs = node.data.streamLogs || [];
+    let streamHtml = '';
+    if (logs.length === 0) {
+      streamHtml = `<p class="placeholder-text" style="font-size:10px;" data-i18n="stream_empty_placeholder">Stream timeline output will appear here...</p>`;
+    } else {
+      logs.forEach(msg => {
+        const isUser = msg.role === 'user';
+        streamHtml += `
+          <div style="font-size:10px; margin-bottom:4px; padding:4px 6px; border-radius:6px; background:${isUser ? 'rgba(56,189,248,0.15)' : 'rgba(139,92,246,0.15)'}; border:1px solid ${isUser ? 'rgba(56,189,248,0.3)' : 'rgba(139,92,246,0.3)'}">
+            <strong style="color:${isUser ? '#38bdf8' : '#a855f7'}">${isUser ? 'User' : 'Assistant'}:</strong> ${msg.text}
+          </div>
+        `;
+      });
+    }
+    html += `
+      <div class="node-field-group">
+        <label data-i18n="node_stream_view">Stream View</label>
+        <div class="stream-logs-box" style="max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
+          ${streamHtml}
+        </div>
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.OUTPUT) {
     html += `<div class="node-field-group"><label data-i18n="prop_output_label">Label</label><input type="text" class="node-input-text inline-edit" data-prop="outputLabel" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Final Result"></div>`;
   }
@@ -377,6 +407,21 @@ function setupNodeEvents(cardEl, node) {
     modelDeleteNode(node.id);
     e.stopPropagation();
   });
+
+  // Send Event Button for event_wait node
+  const sendEventBtn = cardEl.querySelector('.send-event-btn');
+  if (sendEventBtn) {
+    sendEventBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const inputEl = cardEl.querySelector('[data-prop="eventInput"]');
+      const val = inputEl ? inputEl.value.trim() : '';
+      if (val) {
+        import('./runtime.js').then(module => {
+          module.triggerNodeEvent(node.id, val);
+        });
+      }
+    });
+  }
 
   // Wire up port mouse events for connector lines dragging
   cardEl.querySelectorAll('.port-dot').forEach(dot => {
