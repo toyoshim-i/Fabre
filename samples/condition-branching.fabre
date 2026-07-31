@@ -1,0 +1,66 @@
+{
+  "format": "fabre-workflow",
+  "version": "0.1.0",
+  "meta": {
+    "title": "Condition Branching & Flow",
+    "description": "Demonstrates dynamic flow control branching to True / False ports based on text rules.",
+    "author": "Fabre Team",
+    "createdAt": "2026-07-31T12:00:00.000Z",
+    "updatedAt": "2026-07-31T12:00:00.000Z"
+  },
+  "nodes": [
+    {
+      "id": "node_start_1",
+      "type": "start",
+      "title": "Start Node",
+      "x": 60,
+      "y": 180,
+      "width": 240,
+      "height": 140,
+      "data": {
+        "inputValue": "TEST PASS"
+      }
+    },
+    {
+      "id": "node_cond_1",
+      "type": "condition",
+      "title": "Condition Check",
+      "x": 350,
+      "y": 180,
+      "width": 270,
+      "height": 170,
+      "data": {
+        "conditionType": "contains",
+        "conditionValue": "PASS"
+      }
+    },
+    {
+      "id": "node_out_pass",
+      "type": "output",
+      "title": "Output (Pass)",
+      "x": 680,
+      "y": 80,
+      "width": 240,
+      "height": 170,
+      "data": {}
+    },
+    {
+      "id": "node_out_fail",
+      "type": "output",
+      "title": "Output (Fail)",
+      "x": 680,
+      "y": 280,
+      "width": 240,
+      "height": 170,
+      "data": {}
+    }
+  ],
+  "links": [
+    { "id": "link_f1", "fromNode": "node_start_1", "fromPort": "flow-out", "toNode": "node_cond_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f2", "fromNode": "node_cond_1", "fromPort": "flow-true", "toNode": "node_out_pass", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_cond_1", "fromPort": "flow-false", "toNode": "node_out_fail", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_d1", "fromNode": "node_start_1", "fromPort": "data-out", "toNode": "node_cond_1", "toPort": "text-in", "type": "data" },
+    { "id": "link_d2", "fromNode": "node_cond_1", "fromPort": "data-out", "toNode": "node_out_pass", "toPort": "text-in", "type": "data" }
+  ],
+  "variables": {}
+}

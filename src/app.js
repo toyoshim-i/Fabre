@@ -22,13 +22,15 @@ import {
   deselectNodes 
 } from './canvas.js';
 import { 
+  initRecentFiles 
+} from './state.js';
+import { 
   log, 
   applyLanguage, 
   applyTheme, 
   initTabs, 
   initUiListeners, 
   initRunnerControls,
-  initPresetControls,
   initProjectFileControls,
   initSettingsUI, 
   updateVariablesUI 
@@ -38,7 +40,6 @@ function initEvents() {
   // Sidebar tabs nav
   initTabs();
   initRunnerControls();
-  initPresetControls();
   initProjectFileControls();
   
   // Language switcher
@@ -197,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setApiKey(savedApiKey);
 
   initSettingsUI();
+  initRecentFiles();
   
   log('Initializing Fabre v0.1.0 workspace...', 'info');
   initCanvasControls();

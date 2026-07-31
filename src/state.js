@@ -34,6 +34,7 @@ export const state = {
   variables: {},
   logs: [],
   totalSteps: 0,
+  recentFiles: [],
   
   // Local File Access
   directoryHandle: null,
@@ -227,6 +228,140 @@ export function resetRunner() {
   state.emit('runnerStateChanged', 'idle');
   state.emit('currentNodeChanged', null);
   state.emit('totalStepsChanged', 0);
+}
+
+export const DEFAULT_RECENT_FILES = [
+  {
+    id: 'sample_loop',
+    title: 'Self-Debugging Agent Loop',
+    description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'Self-Debugging Agent Loop',
+        description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, height: 140, data: { inputValue: 'function sum(arr) { return arr.reduce((a,b)=>a+b); }' } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, height: 170, data: { promptTemplate: 'Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case.' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are a Senior Engineer.', temperature: 0.7, enableTools: true } },
+        { id: 'node_tool_1', type: 'tool', title: 'Tool Exec', x: 1030, y: 160, width: 260, height: 170, data: { toolType: 'mock_test' } },
+        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1340, y: 160, width: 250, height: 170, data: { variableName: 'audit_result' } },
+        { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1640, y: 160, width: 240, height: 170, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f5', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
+      ],
+      variables: { audit_result: '' }
+    }
+  },
+  {
+    id: 'sample_cond',
+    title: 'Condition Branching & Flow',
+    description: 'Demonstrates dynamic flow control branching to True / False ports based on text rules.',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'Condition Branching & Flow',
+        description: 'Demonstrates dynamic flow control branching to True / False ports based on text rules.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 180, width: 240, height: 140, data: { inputValue: 'TEST PASS' } },
+        { id: 'node_cond_1', type: 'condition', title: 'Condition Check', x: 350, y: 180, width: 270, height: 170, data: { conditionType: 'contains', conditionValue: 'PASS' } },
+        { id: 'node_out_pass', type: 'output', title: 'Output (Pass)', x: 680, y: 80, width: 240, height: 170, data: {} },
+        { id: 'node_out_fail', type: 'output', title: 'Output (Fail)', x: 680, y: 280, width: 240, height: 170, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_cond_1', fromPort: 'flow-true', toNode: 'node_out_pass', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_cond_1', fromPort: 'flow-false', toNode: 'node_out_fail', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_cond_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_cond_1', fromPort: 'data-out', toNode: 'node_out_pass', toPort: 'text-in', type: 'data' }
+      ],
+      variables: {}
+    }
+  },
+  {
+    id: 'sample_chat',
+    title: 'Simple Chat with Memory',
+    description: 'Combines prompt interpolation and variable storage to preserve chat responses in memory.',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'Simple Chat with Memory',
+        description: 'Combines prompt interpolation and variable storage to preserve chat responses in memory.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, height: 140, data: { inputValue: 'What is WebAssembly?' } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, height: 170, data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 } },
+        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1030, y: 160, width: 250, height: 170, data: { variableName: 'chat_history' } },
+        { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1330, y: 160, width: 240, height: 170, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
+      ],
+      variables: { chat_history: '' }
+    }
+  }
+];
+
+export function initRecentFiles() {
+  const saved = localStorage.getItem('fabre_recent_files');
+  if (saved) {
+    try {
+      state.recentFiles = JSON.parse(saved);
+    } catch (e) {
+      state.recentFiles = [...DEFAULT_RECENT_FILES];
+    }
+  } else {
+    state.recentFiles = [...DEFAULT_RECENT_FILES];
+  }
+  state.emit('recentFilesChanged', state.recentFiles);
+}
+
+export function addRecentFile(fileObj) {
+  state.recentFiles = state.recentFiles.filter(f => f.title !== fileObj.title && f.id !== fileObj.id);
+  state.recentFiles.unshift(fileObj);
+  if (state.recentFiles.length > 10) {
+    state.recentFiles = state.recentFiles.slice(0, 10);
+  }
+  try {
+    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
+  } catch (e) {}
+  state.emit('recentFilesChanged', state.recentFiles);
+}
+
+export function removeRecentFile(id) {
+  state.recentFiles = state.recentFiles.filter(f => f.id !== id);
+  try {
+    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
+  } catch (e) {}
+  state.emit('recentFilesChanged', state.recentFiles);
 }
 
 // ==========================================================================

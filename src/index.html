@@ -37,15 +37,15 @@
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span data-i18n="btn_connect_dir">Connect Directory</span>
         </button>
-        <button id="export-project-btn" class="btn btn-secondary btn-sm" title="Save workflow to JSON file">
+        <button id="export-project-btn" class="btn btn-secondary btn-sm" title="Save workflow to .fabre file">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          <span data-i18n="btn_export_project">Save Project</span>
+          <span data-i18n="btn_export_project">Save Project (.fabre)</span>
         </button>
-        <button id="import-project-btn" class="btn btn-secondary btn-sm" title="Load workflow from JSON file">
+        <button id="import-project-btn" class="btn btn-secondary btn-sm" title="Open workflow from .fabre file">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-          <span data-i18n="btn_import_project">Load Project</span>
+          <span data-i18n="btn_import_project">Open Project</span>
         </button>
-        <input type="file" id="import-project-input" accept=".json" style="display: none;">
+        <input type="file" id="import-project-input" accept=".fabre,.json" style="display: none;">
       </div>
     </header>
 
@@ -57,46 +57,44 @@
           <h3 data-i18n="palette_title">Palette</h3>
           <span class="subtitle" data-i18n="palette_subtitle">Drag or Click to Add</span>
         </div>
-        <div class="palette-items">
-          <button class="palette-item" data-node-type="start" title="エージェントの開始地点。ファイル選択などで初期入力を与えます。">
-            <div class="palette-icon start-color">▶</div>
-            <span data-i18n="node_start">Start Node</span>
+        <div class="palette-list">
+          <button class="palette-item" data-node-type="start">
+            <span class="palette-icon" style="color: #10b981;">▶</span>
+            <span class="palette-label" data-i18n="node_start">Start Node</span>
           </button>
-          <button class="palette-item" data-node-type="prompt" title="変数を埋め込んでLLMのプロンプトを構築します。">
-            <div class="palette-icon prompt-color">✎</div>
-            <span data-i18n="node_prompt">Prompt Builder</span>
+          <button class="palette-item" data-node-type="prompt">
+            <span class="palette-icon" style="color: #06b6d4;">✏</span>
+            <span class="palette-label" data-i18n="node_prompt">Prompt Builder</span>
           </button>
-          <button class="palette-item" data-node-type="llm" title="Chrome組み込みAIまたは外部APIでLLMを実行します。">
-            <div class="palette-icon llm-color">🤖</div>
-            <span data-i18n="node_llm">LLM Call</span>
+          <button class="palette-item" data-node-type="llm">
+            <span class="palette-icon" style="color: #8b5cf6;">🧠</span>
+            <span class="palette-label" data-i18n="node_llm">LLM Call</span>
           </button>
-          <button class="palette-item" data-node-type="extractor" title="応答からJSONキーやコードブロックをノンコーディングで抽出します。">
-            <div class="palette-icon extractor-color">⚲</div>
-            <span data-i18n="node_extractor">Extractor</span>
+          <button class="palette-item" data-node-type="extractor">
+            <span class="palette-icon" style="color: #ec4899;">🔍</span>
+            <span class="palette-label" data-i18n="node_extractor">Extractor</span>
           </button>
-          <button class="palette-item" data-node-type="condition" title="条件（ContainsやRegexなど）で処理の流れを分岐します。">
-            <div class="palette-icon condition-color">⇅</div>
-            <span data-i18n="node_condition">Condition</span>
+          <button class="palette-item" data-node-type="condition">
+            <span class="palette-icon" style="color: #f59e0b;">🔀</span>
+            <span class="palette-label" data-i18n="node_condition">Condition</span>
           </button>
-          <button class="palette-item" data-node-type="set_var" title="現在の変数メモリに値を保存します。">
-            <div class="palette-icon setvar-color">⛃</div>
-            <span data-i18n="node_setvar">Set Variable</span>
+          <button class="palette-item" data-node-type="set_var">
+            <span class="palette-icon" style="color: #3b82f6;">💾</span>
+            <span class="palette-label" data-i18n="node_set_var">Set Var</span>
           </button>
-          <button class="palette-item" data-node-type="tool" title="ファイルの読み書きや模擬テストなどのツールを動かします。">
-            <div class="palette-icon tool-color">🛠</div>
-            <span data-i18n="node_tool">Tool Exec</span>
+          <button class="palette-item" data-node-type="tool">
+            <span class="palette-icon" style="color: #64748b;">🛠</span>
+            <span class="palette-label" data-i18n="node_tool">Tool Exec</span>
           </button>
-          <button class="palette-item" data-node-type="output" title="最終結果を出力して記録します。">
-            <div class="palette-icon output-color">■</div>
-            <span data-i18n="node_output">Output Node</span>
+          <button class="palette-item" data-node-type="output">
+            <span class="palette-icon" style="color: #ef4444;">■</span>
+            <span class="palette-label" data-i18n="node_output">Output Node</span>
           </button>
         </div>
-
       </aside>
 
-      <!-- Center: Node Editor Canvas -->
-      <main id="canvas-area">
-        <!-- Dot Grid Canvas Wrapper -->
+      <!-- Center Node Canvas -->
+      <main id="canvas-container">
         <div id="canvas-viewport">
           <div id="node-canvas">
             <!-- SVG overlay for rendering connections -->
@@ -128,10 +126,10 @@
         </div>
       </main>
 
-      <!-- Right Sidebar: Panels -->
+      <!-- Right Sidebar: Properties & Controls -->
       <aside id="inspector-sidebar">
-        <!-- Tab Headers -->
-        <div class="tabs-header">
+        <!-- Sidebar Navigation Tabs -->
+        <div class="sidebar-tabs">
           <button class="tab-btn active" data-tab="tab-control" data-i18n="tab_runner">Runner</button>
           <button class="tab-btn" data-tab="tab-files" data-i18n="tab_files">Files</button>
           <button class="tab-btn" data-tab="tab-vars" data-i18n="tab_memory">Memory</button>
@@ -186,21 +184,6 @@
               </div>
             </div>
 
-            <!-- Templates Section -->
-            <div class="templates-section">
-              <h4 data-i18n="preset_title">Load Presets</h4>
-              <div class="template-buttons">
-                <button id="template-code-loop" class="template-btn">
-                  <h5 data-i18n="preset_loop_title">Self-Debugging Agent Loop</h5>
-                  <p data-i18n="preset_loop_desc">ローカルコードを検証し、テスト結果をフィードバックしてバグを自己修正するループフロー。</p>
-                </button>
-                <button id="template-condition-branch" class="template-btn">
-                  <h5 data-i18n="preset_cond_title">Condition Branching & Flow</h5>
-                  <p data-i18n="preset_cond_desc">条件判定による成功・失敗ポートへの動的フロー制御デモ。</p>
-                </button>
-                <button id="template-basic-chat" class="template-btn">
-                  <h5 data-i18n="preset_chat_title">Simple Chat with Memory</h5>
-                  <p data-i18n="preset_chat_desc">入力プロンプトと変数格納を組み合わせて会話履歴を保持するチャットボット。</p>
                 </button>
               </div>
             </div>
@@ -366,6 +349,32 @@ ollama serve</code></pre>
       <div class="modal-footer">
         <button id="modal-open-settings-btn" class="btn btn-primary" data-i18n="btn_open_settings">Open Settings</button>
         <button id="modal-close-btn" class="btn btn-secondary" data-i18n="btn_close">Close</button>
+      </div>
+    </div>
+  <!-- Save Project Metadata Modal -->
+  <div id="save-meta-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card dialog-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 data-i18n="save_meta_modal_title">Save Project (.fabre)</h3>
+        <button id="save-meta-close-x" class="modal-close-x">&times;</button>
+      </div>
+      <div class="modal-body dialog-body">
+        <div class="node-field-group">
+          <label data-i18n="label_meta_title">Project Title</label>
+          <input type="text" id="save-meta-title" class="node-input-text" placeholder="My Workflow Agent">
+        </div>
+        <div class="node-field-group" style="margin-top: 10px;">
+          <label data-i18n="label_meta_desc">Description</label>
+          <textarea id="save-meta-desc" class="node-input-text node-textarea" placeholder="Brief description of this workflow..."></textarea>
+        </div>
+        <div class="node-field-group" style="margin-top: 10px;">
+          <label data-i18n="label_meta_author">Author</label>
+          <input type="text" id="save-meta-author" class="node-input-text" placeholder="User">
+        </div>
+      </div>
+      <div class="modal-footer dialog-footer">
+        <button id="save-meta-confirm-btn" class="btn btn-primary" data-i18n="btn_save_download">Save & Download</button>
+        <button id="save-meta-cancel-btn" class="btn btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
   </div>

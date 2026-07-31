@@ -14,6 +14,9 @@ import {
   clearCanvasState,
   resetRunner,
   setVariable,
+  initRecentFiles,
+  addRecentFile,
+  removeRecentFile,
   updateNodeTitle,
   updateNodeData,
   setSelectedNode,
@@ -128,6 +131,11 @@ export function initUiListeners() {
     const stepsEl = document.getElementById('total-steps-val');
     if (stepsEl) stepsEl.innerText = totalSteps;
   });
+
+  // 10. Recent Files changes
+  state.on('recentFilesChanged', (recentFiles) => {
+    renderRecentFilesUI(recentFiles);
+  });
 }
 
 function updateRunnerUI(runnerState) {
@@ -190,252 +198,108 @@ export function initRunnerControls() {
   }
 }
 
-export function loadPreset(presetName) {
+export function renderRecentFilesUI(recentFiles) {
+  const listEl = document.getElementById('recent-files-list');
+  if (!listEl) return;
+
+  if (!recentFiles || recentFiles.length === 0) {
+    listEl.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); padding: 8px 0;">${state.lang === 'en' ? 'No recent files.' : '最近開いたファイルはありません。'}</p>`;
+    return;
+  }
+
+  listEl.innerHTML = '';
+  recentFiles.forEach(file => {
+    const card = document.createElement('div');
+    card.className = 'recent-file-card';
+    card.innerHTML = `
+      <div class="recent-file-card-header">
+        <div class="recent-file-card-title">${file.title}</div>
+        <button class="recent-file-remove-btn" title="Remove from list">&times;</button>
+      </div>
+      <div class="recent-file-card-desc">${file.description || ''}</div>
+      <div class="recent-file-card-footer">
+        <span>.fabre</span>
+        <span>${new Date(file.updatedAt).toLocaleDateString()}</span>
+      </div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('recent-file-remove-btn')) {
+        e.stopPropagation();
+        removeRecentFile(file.id);
+        return;
+      }
+      if (file.data) {
+        loadWorkflowData(file.data, file.title);
+      }
+    });
+
+    listEl.appendChild(card);
+  });
+}
+
+export function loadWorkflowData(data, title = '') {
   clearCanvasState();
   resetRunner();
 
-  if (presetName === 'code-loop') {
-    const node1 = {
-      id: 'node_start_1',
-      type: NODE_TYPES.START,
-      title: 'Start Node',
-      x: 60,
-      y: 160,
-      width: 240,
-      height: 140,
-      data: { inputValue: 'function sum(arr) { return arr.reduce((a,b)=>a+b); }' }
-    };
-    const node2 = {
-      id: 'node_prompt_1',
-      type: NODE_TYPES.PROMPT,
-      title: 'Prompt Builder',
-      x: 350,
-      y: 160,
-      width: 300,
-      height: 170,
-      data: { promptTemplate: 'Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case.' }
-    };
-    const node3 = {
-      id: 'node_llm_1',
-      type: NODE_TYPES.LLM,
-      title: 'LLM Call',
-      x: 700,
-      y: 160,
-      width: 280,
-      height: 170,
-      data: { systemPrompt: 'You are a Software Auditor.', temperature: 0.7, enableTools: true }
-    };
-    const node4 = {
-      id: 'node_tool_1',
-      type: NODE_TYPES.TOOL,
-      title: 'Tool Exec',
-      x: 1030,
-      y: 160,
-      width: 260,
-      height: 170,
-      data: { toolType: 'mock_test' }
-    };
-    const node5 = {
-      id: 'node_setvar_1',
-      type: NODE_TYPES.SET_VAR,
-      title: 'Set Var',
-      x: 1340,
-      y: 160,
-      width: 250,
-      height: 170,
-      data: { variableName: 'audit_result' }
-    };
-    const node6 = {
-      id: 'node_output_1',
-      type: NODE_TYPES.OUTPUT,
-      title: 'Output Node',
-      x: 1640,
-      y: 160,
-      width: 240,
-      height: 170,
-      data: {}
-    };
+  (data.nodes || []).forEach(n => addNode(n));
+  (data.links || []).forEach(l => addLink(l));
+  if (data.variables) {
+    Object.entries(data.variables).forEach(([k, v]) => setVariable(k, v));
+  }
 
-    addNode(node1);
-    addNode(node2);
-    addNode(node3);
-    addNode(node4);
-    addNode(node5);
-    addNode(node6);
+  addLog(state.lang === 'en' ? `Loaded workflow: ${title || 'Project'}` : `ワークフロー「${title || 'プロジェクト'}」を読み込みました。`, 'success');
+}
 
-    // Add Flow links
-    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f4', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f5', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' });
+export function openSaveProjectModal() {
+  const modal = document.getElementById('save-meta-modal');
+  const titleInput = document.getElementById('save-meta-title');
+  const descInput = document.getElementById('save-meta-desc');
+  const authorInput = document.getElementById('save-meta-author');
 
-    // Add Data links
-    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' });
-    addLink({ id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' });
-    addLink({ id: 'link_d3', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' });
-    addLink({ id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' });
-
-    addLog(state.lang === 'en' ? 'Loaded preset: Self-Debugging Agent Loop' : 'プリセット「自己デバッグループ」を読み込みました。', 'success');
-  } else if (presetName === 'condition-branch') {
-    const node1 = {
-      id: 'node_start_1',
-      type: NODE_TYPES.START,
-      title: 'Start Node',
-      x: 60,
-      y: 180,
-      width: 240,
-      height: 140,
-      data: { inputValue: 'TEST PASS' }
-    };
-    const node2 = {
-      id: 'node_cond_1',
-      type: NODE_TYPES.CONDITION,
-      title: 'Condition Check',
-      x: 350,
-      y: 180,
-      width: 270,
-      height: 170,
-      data: { conditionType: 'contains', conditionValue: 'PASS' }
-    };
-    const node3 = {
-      id: 'node_out_pass',
-      type: NODE_TYPES.OUTPUT,
-      title: 'Output (Pass)',
-      x: 680,
-      y: 80,
-      width: 240,
-      height: 170,
-      data: {}
-    };
-    const node4 = {
-      id: 'node_out_fail',
-      type: NODE_TYPES.OUTPUT,
-      title: 'Output (Fail)',
-      x: 680,
-      y: 280,
-      width: 240,
-      height: 170,
-      data: {}
-    };
-
-    addNode(node1);
-    addNode(node2);
-    addNode(node3);
-    addNode(node4);
-
-    // Add Flow links
-    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f2', fromNode: 'node_cond_1', fromPort: 'flow-true', toNode: 'node_out_pass', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f3', fromNode: 'node_cond_1', fromPort: 'flow-false', toNode: 'node_out_fail', toPort: 'flow-in', type: 'flow' });
-
-    // Add Data links
-    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_cond_1', toPort: 'text-in', type: 'data' });
-    addLink({ id: 'link_d2', fromNode: 'node_cond_1', fromPort: 'data-out', toNode: 'node_out_pass', toPort: 'text-in', type: 'data' });
-
-    addLog(state.lang === 'en' ? 'Loaded preset: Condition Branching & Flow' : 'プリセット「条件分岐デモ」を読み込みました。', 'success');
-  } else if (presetName === 'basic-chat') {
-    const node1 = {
-      id: 'node_start_1',
-      type: NODE_TYPES.START,
-      title: 'Start Node',
-      x: 60,
-      y: 160,
-      width: 240,
-      height: 140,
-      data: { inputValue: 'What is WebAssembly?' }
-    };
-    const node2 = {
-      id: 'node_prompt_1',
-      type: NODE_TYPES.PROMPT,
-      title: 'Prompt Builder',
-      x: 350,
-      y: 160,
-      width: 300,
-      height: 170,
-      data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' }
-    };
-    const node3 = {
-      id: 'node_llm_1',
-      type: NODE_TYPES.LLM,
-      title: 'LLM Call',
-      x: 700,
-      y: 160,
-      width: 280,
-      height: 170,
-      data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 }
-    };
-    const node4 = {
-      id: 'node_setvar_1',
-      type: NODE_TYPES.SET_VAR,
-      title: 'Set Var',
-      x: 1030,
-      y: 160,
-      width: 250,
-      height: 170,
-      data: { variableName: 'chat_history' }
-    };
-    const node5 = {
-      id: 'node_output_1',
-      type: NODE_TYPES.OUTPUT,
-      title: 'Output Node',
-      x: 1330,
-      y: 160,
-      width: 240,
-      height: 170,
-      data: {}
-    };
-
-    addNode(node1);
-    addNode(node2);
-    addNode(node3);
-    addNode(node4);
-    addNode(node5);
-
-    // Add Flow links
-    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' });
-    addLink({ id: 'link_f4', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' });
-
-    // Add Data links
-    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' });
-    addLink({ id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' });
-    addLink({ id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' });
-    addLink({ id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' });
-
-    addLog(state.lang === 'en' ? 'Loaded preset: Simple Chat with Memory' : 'プリセット「シンプルチャット」を読み込みました。', 'success');
+  if (modal) {
+    modal.style.display = 'flex';
+    if (titleInput) titleInput.value = `My Workflow Agent`;
+    if (descInput) descInput.value = '';
+    if (authorInput) authorInput.value = 'User';
   }
 }
 
-export function initPresetControls() {
-  const codeLoopBtn = document.getElementById('template-code-loop');
-  if (codeLoopBtn) codeLoopBtn.addEventListener('click', () => loadPreset('code-loop'));
-
-  const condBranchBtn = document.getElementById('template-condition-branch');
-  if (condBranchBtn) condBranchBtn.addEventListener('click', () => loadPreset('condition-branch'));
-
-  const basicChatBtn = document.getElementById('template-basic-chat');
-  if (basicChatBtn) basicChatBtn.addEventListener('click', () => loadPreset('basic-chat'));
-}
-
-export function exportProject() {
+export function exportProjectWithMeta(meta) {
   const projectData = {
+    format: 'fabre-workflow',
     version: '0.1.0',
-    timestamp: new Date().toISOString(),
+    meta: {
+      title: meta.title || 'My Workflow Agent',
+      description: meta.description || '',
+      author: meta.author || 'User',
+      createdAt: meta.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
     nodes: state.nodes,
     links: state.links,
     variables: state.variables
   };
+
   const jsonStr = JSON.stringify(projectData, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `fabre-workflow-${Date.now()}.json`;
+  const fileName = (meta.title || 'workflow').toLowerCase().replace(/[^a-z0-9]/g, '_');
+  a.download = `${fileName}.fabre`;
   a.click();
   URL.revokeObjectURL(url);
-  addLog(state.lang === 'en' ? 'Exported project workflow JSON.' : 'プロジェクトワークフロー (JSON) を保存・ダウンロードしました。', 'success');
+
+  addRecentFile({
+    id: `file_${Date.now()}`,
+    title: meta.title || 'My Workflow Agent',
+    description: meta.description || '',
+    updatedAt: new Date().toISOString(),
+    data: projectData
+  });
+
+  addLog(state.lang === 'en' ? `Exported project as .fabre file.` : `プロジェクト (.fabre) を保存・ダウンロードしました。`, 'success');
 }
 
 export function importProject(file) {
@@ -444,20 +308,21 @@ export function importProject(file) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data.nodes || !data.links) {
-        throw new Error('Invalid Fabre workflow JSON format.');
+        throw new Error('Invalid Fabre workflow file format.');
       }
-      clearCanvasState();
-      resetRunner();
+      loadWorkflowData(data, data.meta?.title || file.name);
 
-      (data.nodes || []).forEach(n => addNode(n));
-      (data.links || []).forEach(l => addLink(l));
-      if (data.variables) {
-        Object.entries(data.variables).forEach(([k, v]) => setVariable(k, v));
-      }
+      // Add to recent files history
+      addRecentFile({
+        id: `file_${Date.now()}`,
+        title: data.meta?.title || file.name.replace(/\.(fabre|json)$/i, ''),
+        description: data.meta?.description || 'Custom loaded workflow',
+        updatedAt: new Date().toISOString(),
+        data: data
+      });
 
-      addLog(state.lang === 'en' ? 'Successfully loaded project workflow JSON.' : 'プロジェクトワークフロー (JSON) を正常に読み込みました。', 'success');
     } catch (err) {
-      addLog(state.lang === 'en' ? `Failed to load JSON: ${err.message}` : `JSON読み込み失敗: ${err.message}`, 'error');
+      addLog(state.lang === 'en' ? `Failed to load .fabre file: ${err.message}` : `ファイル読み込み失敗: ${err.message}`, 'error');
     }
   };
   reader.readAsText(file);
@@ -465,7 +330,30 @@ export function importProject(file) {
 
 export function initProjectFileControls() {
   const exportBtn = document.getElementById('export-project-btn');
-  if (exportBtn) exportBtn.addEventListener('click', exportProject);
+  if (exportBtn) exportBtn.addEventListener('click', openSaveProjectModal);
+
+  const saveConfirmBtn = document.getElementById('save-meta-confirm-btn');
+  const saveCancelBtn = document.getElementById('save-meta-cancel-btn');
+  const saveCloseX = document.getElementById('save-meta-close-x');
+  const saveModal = document.getElementById('save-meta-modal');
+
+  const closeSaveModal = () => {
+    if (saveModal) saveModal.style.display = 'none';
+  };
+
+  if (saveCloseX) saveCloseX.addEventListener('click', closeSaveModal);
+  if (saveCancelBtn) saveCancelBtn.addEventListener('click', closeSaveModal);
+
+  if (saveConfirmBtn) {
+    saveConfirmBtn.addEventListener('click', () => {
+      const title = document.getElementById('save-meta-title')?.value.trim();
+      const description = document.getElementById('save-meta-desc')?.value.trim();
+      const author = document.getElementById('save-meta-author')?.value.trim();
+      
+      exportProjectWithMeta({ title, description, author });
+      closeSaveModal();
+    });
+  }
 
   const importBtn = document.getElementById('import-project-btn');
   const importInput = document.getElementById('import-project-input');
@@ -476,6 +364,16 @@ export function initProjectFileControls() {
         importProject(e.target.files[0]);
         importInput.value = '';
       }
+    });
+  }
+
+  const clearRecentBtn = document.getElementById('clear-recent-btn');
+  if (clearRecentBtn) {
+    clearRecentBtn.addEventListener('click', () => {
+      state.recentFiles = [];
+      try { localStorage.removeItem('fabre_recent_files'); } catch (e) {}
+      state.emit('recentFilesChanged', state.recentFiles);
+      addLog(state.lang === 'en' ? 'Cleared recent files history.' : '最近開いたファイルの履歴をクリアしました。', 'info');
     });
   }
 }

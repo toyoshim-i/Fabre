@@ -1471,3 +1471,78 @@ body.theme-light-slate .code-instructions {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Recent Files History Styling */
+.recent-files-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.recent-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-file-card {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+  position: relative;
+}
+
+.recent-file-card:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.recent-file-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recent-file-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 2px;
+}
+
+.recent-file-card-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.recent-file-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.recent-file-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.recent-file-remove-btn:hover {
+  color: var(--color-error);
+}
