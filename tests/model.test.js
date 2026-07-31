@@ -349,4 +349,35 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(msgs3[1].role, 'assistant');
   });
 
+  await t.test('should manage MCP servers and aggregate tool schemas for LLM Function Calling', async () => {
+    const { removeMcpServer, updateGlobalMcpTools, getMcpToolsForOpenAi } = await import('../src/mcp.js');
+    
+    // Simulate registered MCP server in state
+    state.mcpServers = [
+      {
+        id: 'srv_test_1',
+        name: 'GitMCP',
+        url: 'http://localhost:3000/mcp',
+        status: 'connected',
+        tools: [
+          { name: 'git_status', description: 'Get git status', inputSchema: { type: 'object', properties: {} } },
+          { name: 'git_commit', description: 'Commit changes', inputSchema: { type: 'object', properties: { message: { type: 'string' } } } }
+        ]
+      }
+    ];
+
+    updateGlobalMcpTools();
+    assert.strictEqual(state.mcpTools.length, 2);
+    assert.strictEqual(state.mcpTools[0].fullId, 'mcp:GitMCP:git_status');
+
+    const openAiTools = getMcpToolsForOpenAi();
+    assert.strictEqual(openAiTools.length, 2);
+    assert.strictEqual(openAiTools[0].function.name, 'git_status');
+
+    // Test tool removal
+    removeMcpServer('srv_test_1');
+    assert.strictEqual(state.mcpServers.length, 0);
+    assert.strictEqual(state.mcpTools.length, 0);
+  });
+
 });

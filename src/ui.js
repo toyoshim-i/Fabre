@@ -28,6 +28,7 @@ import { runLlmQuery } from './llm.js';
 import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow, runChatTurn } from './runtime.js';
 import { drawConnections } from './canvas.js';
 import { t, updateDomTranslations } from './i18n.js';
+import { registerMcpServer, removeMcpServer } from './mcp.js';
 
 /**
  * Standard log message wrapper delegating to Model Mutator
@@ -237,6 +238,47 @@ export function renderRecentFilesUI(recentFiles) {
     });
 
     listEl.appendChild(card);
+  });
+}
+
+export function renderMcpServersUI(mcpServers = state.mcpServers) {
+  const container = document.getElementById('mcp-servers-list');
+  if (!container) return;
+
+  if (!mcpServers || mcpServers.length === 0) {
+    container.innerHTML = `<p class="placeholder-text" style="font-size:10px;">${state.lang === 'en' ? 'No MCP servers registered yet.' : '登録済みの MCP サーバーはありません。'}</p>`;
+    return;
+  }
+
+  let html = '';
+  mcpServers.forEach(server => {
+    const isSuccess = server.status === 'connected';
+    const isError = server.status === 'error';
+    const badgeColor = isSuccess ? 'var(--color-success)' : (isError ? 'var(--color-error)' : 'var(--primary)');
+    const toolCount = (server.tools || []).length;
+
+    html += `
+      <div class="mcp-server-card" style="padding:8px; border-radius:6px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:11px; font-weight:600; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${badgeColor};"></span>
+            <span>${server.name}</span>
+          </div>
+          <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">${server.url}</div>
+          <div style="font-size:9px; color:${badgeColor}; margin-top:2px;">${server.status.toUpperCase()} (${toolCount} tools)</div>
+        </div>
+        <button class="btn btn-secondary btn-xs remove-mcp-btn" data-mcp-id="${server.id}" style="font-size:10px; padding:2px 6px;">&times;</button>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('.remove-mcp-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-mcp-id');
+      if (id) removeMcpServer(id);
+    });
   });
 }
 
@@ -623,13 +665,25 @@ export function showNodeProperties(nodeId) {
       </div>
     `;
   } else if (node.type === NODE_TYPES.TOOL) {
+    let toolOptions = `
+      <option value="mock_test" ${node.data.toolType === 'mock_test' ? 'selected' : ''}>Mock Code Compiler/Tester</option>
+      <option value="list_files" ${node.data.toolType === 'list_files' ? 'selected' : ''}>Local FS: List Files</option>
+      <option value="read_file" ${node.data.toolType === 'read_file' ? 'selected' : ''}>Local FS: Read File</option>
+      <option value="write_file" ${node.data.toolType === 'write_file' ? 'selected' : ''}>Local FS: Write File</option>
+      <option value="js_sandbox" ${node.data.toolType === 'js_sandbox' ? 'selected' : ''}>Real Custom JS Sandbox</option>
+    `;
+    if (state.mcpTools && state.mcpTools.length > 0) {
+      toolOptions += `<optgroup label="MCP Tools (Model Context Protocol)">`;
+      state.mcpTools.forEach(tool => {
+        toolOptions += `<option value="${tool.fullId}" ${node.data.toolType === tool.fullId ? 'selected' : ''}>${tool.serverName}: ${tool.name}</option>`;
+      });
+      toolOptions += `</optgroup>`;
+    }
     html += `
       <div class="form-group">
         <label>${t.prop_tool_type}</label>
         <select id="prop-tool-type">
-          <option value="mock_test" ${node.data.toolType === 'mock_test' ? 'selected' : ''}>Mock Code Compiler/Tester</option>
-          <option value="mock_search" ${node.data.toolType === 'mock_search' ? 'selected' : ''}>Mock Web Search</option>
-          <option value="js_sandbox" ${node.data.toolType === 'js_sandbox' ? 'selected' : ''}>Real Custom JS Sandbox</option>
+          ${toolOptions}
         </select>
       </div>
     `;
@@ -1152,5 +1206,28 @@ export function initSettingsUI() {
   const key = document.getElementById('settings-api-key');
   if (key) key.value = state.apiKey || '';
 
+  const addMcpBtn = document.getElementById('add-mcp-server-btn');
+  if (addMcpBtn) {
+    addMcpBtn.addEventListener('click', () => {
+      const nameInput = document.getElementById('mcp-server-name');
+      const urlInput = document.getElementById('mcp-server-url');
+      const name = nameInput ? nameInput.value : '';
+      const serverUrl = urlInput ? urlInput.value : '';
+      if (serverUrl) {
+        registerMcpServer(serverUrl, name);
+        if (nameInput) nameInput.value = '';
+        if (urlInput) urlInput.value = '';
+      }
+    });
+  }
+
+  state.on('mcpServersChanged', (servers) => renderMcpServersUI(servers));
+  state.on('mcpToolsChanged', () => {
+    if (state.selectedNodeId) {
+      showNodeProperties(state.selectedNodeId);
+    }
+  });
+
+  renderMcpServersUI();
   updateLlmProviderUI(state.llmProvider);
 }

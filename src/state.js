@@ -36,6 +36,8 @@ export const state = {
   totalSteps: 0,
   recentFiles: [],
   chatMessages: [],
+  mcpServers: [],
+  mcpTools: [],
   
   // Local File Access
   directoryHandle: null,

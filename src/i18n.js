@@ -39,11 +39,16 @@ export const DICTIONARY = {
   tab_logs: { en: 'Logs', ja: 'ログ・履歴' },
   tab_config: { en: 'Config', ja: '設定' },
 
-  // Chat Tab
-  chat_title: { en: 'Interactive Agent Chat', ja: '対話型エージェントチャット' },
-  chat_placeholder: { en: 'Type a message to run workflow...', ja: 'メッセージを入力して送信...' },
-  btn_send: { en: 'Send', ja: '送信' },
-  chat_empty_prompt: { en: 'Send a message to start continuous conversation with the workflow agent.', ja: 'メッセージを送信するとワークフローがリアルタイム実行されます。' },
+  // MCP Server Management
+  mcp_servers_title: { en: 'MCP Servers (Model Context Protocol)', ja: 'MCP サーバー登録 (Model Context Protocol)' },
+  mcp_name_label: { en: 'Server Alias', ja: 'サーバーエイリアス' },
+  mcp_url_label: { en: 'Endpoint URL', ja: 'エンドポイント URL' },
+  mcp_url_placeholder: { en: 'http://localhost:3000/sse', ja: 'http://localhost:3000/sse' },
+  btn_add_mcp_server: { en: '+ Add MCP Server', ja: '+ MCP サーバーを追加' },
+  mcp_server_already_exists: { en: 'MCP Server [{name}] is already registered.', ja: 'MCP サーバー [{name}] は既に登録されています。' },
+  mcp_connected_success: { en: 'Connected to MCP server [{name}] ({count} tools discovered)', ja: 'MCP サーバー [{name}] に接続しました ({count} 個のツールを発見)' },
+  mcp_connect_failed: { en: 'Failed to connect to MCP server [{name}]: {error}', ja: 'MCP サーバー [{name}] への接続に失敗しました: {error}' },
+  mcp_executing_tool: { en: 'Executing MCP Tool [{tool}] on {url}...', ja: 'MCP ツール [{tool}] を {url} で実行中...' },
 
   // Execution Debugger Controls
   runner_control_title: { en: 'Execution Control', ja: 'ワークフロー実行制御' },

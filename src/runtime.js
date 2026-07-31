@@ -485,10 +485,24 @@ function parseReActToolCall(text) {
   return null;
 }
 
+import { callMcpTool } from './mcp.js';
+
 /**
- * Execute local filesystem tools or mock tools
+ * Execute a local or connected MCP tool (testing, file system, sandbox, or remote MCP server)
  */
 export async function executeLocalTool(toolType, inputVal) {
+  if (toolType && toolType.startsWith('mcp:')) {
+    const matchedMcp = (state.mcpTools || []).find(t => t.fullId === toolType);
+    if (!matchedMcp) {
+      const mcpByName = (state.mcpTools || []).find(t => t.name === toolType.replace(/^mcp:/, ''));
+      if (mcpByName) {
+        return await callMcpTool(mcpByName.serverUrl, mcpByName.name, inputVal);
+      }
+      return `Error: MCP Tool '${toolType}' is not currently connected.`;
+    }
+    return await callMcpTool(matchedMcp.serverUrl, matchedMcp.name, inputVal);
+  }
+
   if (toolType === 'mock_test' || toolType === 'run_tests') {
     if (state.variables['current_code']) {
       const code = String(state.variables['current_code']);
