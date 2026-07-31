@@ -138,8 +138,7 @@
       <aside id="inspector-sidebar">
         <!-- Sidebar Navigation Tabs -->
         <div class="sidebar-tabs">
-          <button class="tab-btn active" data-tab="tab-chat" data-i18n="tab_chat">Chat</button>
-          <button class="tab-btn" data-tab="tab-control" data-i18n="tab_runner">Runner</button>
+          <button class="tab-btn active" data-tab="tab-control" data-i18n="tab_runner">Runner</button>
           <button class="tab-btn" data-tab="tab-files" data-i18n="tab_files">Files</button>
           <button class="tab-btn" data-tab="tab-vars" data-i18n="tab_memory">Memory</button>
           <button class="tab-btn" data-tab="tab-logs" data-i18n="tab_logs">Logs</button>
@@ -148,29 +147,8 @@
 
         <!-- Tab Contents -->
         <div class="tab-contents">
-          <!-- 0. Interactive Chat Demo Panel -->
-          <div id="tab-chat" class="tab-content active">
-            <div class="panel-section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <h4 data-i18n="chat_title">Interactive Agent Chat</h4>
-              <button id="clear-chat-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;">Clear</button>
-            </div>
-            
-            <div class="chat-container">
-              <div id="chat-messages" class="chat-messages">
-                <p id="chat-empty-placeholder" class="placeholder-text" data-i18n="chat_empty_prompt">メッセージを送信するとワークフローがリアルタイム実行されます。</p>
-              </div>
-
-              <div class="chat-input-row">
-                <textarea id="chat-input-text" class="node-input-text node-textarea" rows="2" data-i18n-placeholder="chat_placeholder" placeholder="Type a message to run workflow..."></textarea>
-                <button id="chat-send-btn" class="btn btn-primary" style="align-self: flex-end; height: 36px; padding: 0 12px;">
-                  <span data-i18n="btn_send">Send</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
           <!-- 1. Control & Debug Panel -->
-          <div id="tab-control" class="tab-content">
+          <div id="tab-control" class="tab-content active">
             <div class="control-section">
               <h4 data-i18n="runner_control_title">Execution Control</h4>
               <div class="runner-controls-row">

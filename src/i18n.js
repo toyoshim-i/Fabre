@@ -33,7 +33,6 @@ export const DICTIONARY = {
   stream_empty_placeholder: { en: 'Stream timeline output will appear here...', ja: '出力ストリームがここに表示されます...' },
 
   // Sidebar Tabs
-  tab_chat: { en: 'Chat', ja: '対話デモ' },
   tab_runner: { en: 'Runner', ja: '実行制御' },
   tab_files: { en: 'Files', ja: 'ファイル' },
   tab_memory: { en: 'Memory', ja: '変数メモリ' },
