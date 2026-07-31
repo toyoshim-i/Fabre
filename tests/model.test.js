@@ -28,6 +28,7 @@ import {
   resetWorkflow, 
   executeLocalTool 
 } from '../src/runtime.js';
+import { t as translate } from '../src/i18n.js';
 
 test('Model state mutations & events regression tests', async (t) => {
 
@@ -246,6 +247,16 @@ test('Model state mutations & events regression tests', async (t) => {
 
     const sandboxResult = await executeLocalTool('js_sandbox', '1 + 2');
     assert.strictEqual(sandboxResult, '3');
+  });
+
+  await t.test('should translate keys cleanly with parameter interpolation', async () => {
+    setLanguage('ja');
+    assert.strictEqual(translate('btn_run'), '自動実行');
+    assert.strictEqual(translate('workflow_completed', { result: 'OK' }), 'ワークフローの実行が正常終了しました。結果: OK');
+
+    setLanguage('en');
+    assert.strictEqual(translate('btn_run'), 'Run');
+    assert.strictEqual(translate('workflow_completed', { result: 'OK' }), 'Workflow execution completed successfully. Result: OK');
   });
 
 });

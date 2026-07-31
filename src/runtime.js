@@ -13,6 +13,7 @@ import {
   resetRunner
 } from './state.js';
 import { runLlmQuery } from './llm.js';
+import { t } from './i18n.js';
 
 let stepTimer = null;
 
@@ -21,7 +22,7 @@ let stepTimer = null;
  */
 export async function stepWorkflow() {
   if (state.nodes.length === 0) {
-    addLog(state.lang === 'en' ? 'Canvas is empty. Create nodes to run.' : 'キャンバスが空です。ノードを作成してください。', 'warning');
+    addLog(t('canvas_empty_log'), 'warning');
     return;
   }
 
@@ -36,17 +37,12 @@ export async function stepWorkflow() {
   const currentNode = state.nodes.find(n => n.id === state.currentNodeId);
   if (!currentNode) {
     setRunnerState('error');
-    addLog(state.lang === 'en' ? 'Current node not found.' : '現在のノードが見つかりません。', 'error');
+    addLog(t('current_node_not_found'), 'error');
     return;
   }
 
   setRunnerState('running');
-  addLog(
-    state.lang === 'en' 
-      ? `Executing node: [${currentNode.title}] (${currentNode.type})` 
-      : `ノードを実行中: [${currentNode.title}] (${currentNode.type})`,
-    'info'
-  );
+  addLog(t('executing_node', { title: currentNode.title, type: currentNode.type }), 'info');
 
   try {
     // Evaluate Node
@@ -59,12 +55,7 @@ export async function stepWorkflow() {
 
     if (currentNode.type === NODE_TYPES.OUTPUT) {
       setRunnerState('success');
-      addLog(
-        state.lang === 'en' 
-          ? `Workflow execution completed successfully. Result: ${result.outputValue}` 
-          : `ワークフローの実行が正常終了しました。結果: ${result.outputValue}`,
-        'success'
-      );
+      addLog(t('workflow_completed', { result: result.outputValue }), 'success');
       return;
     }
 
@@ -75,7 +66,7 @@ export async function stepWorkflow() {
       }
     } else {
       setRunnerState('success');
-      addLog(state.lang === 'en' ? 'Reached end of flow.' : '制御フローの終端に達しました。', 'info');
+      addLog(t('end_of_flow'), 'info');
     }
   } catch (err) {
     setRunnerState('error');
@@ -119,7 +110,7 @@ export function pauseWorkflow() {
     stepTimer = null;
   }
   setRunnerState('paused');
-  addLog(state.lang === 'en' ? 'Workflow paused.' : '実行を一時停止しました。', 'warning');
+  addLog(t('workflow_paused'), 'warning');
 }
 
 /**
@@ -131,7 +122,7 @@ export function resetWorkflow() {
     stepTimer = null;
   }
   resetRunner();
-  addLog(state.lang === 'en' ? 'Workflow reset.' : '実行状態をリセットしました。', 'info');
+  addLog(t('workflow_reset'), 'info');
 }
 
 /**
@@ -216,7 +207,7 @@ async function evaluateNode(node) {
         if (node.data.enableTools) {
           const reactMatch = parseReActToolCall(outputValue);
           if (reactMatch) {
-            addLog(state.lang === 'en' ? `ReAct Tool Call detected: ${reactMatch.tool}` : `ReAct ツール呼び出しを検出: ${reactMatch.tool}`, 'info');
+            addLog(t('react_tool_detected', { tool: reactMatch.tool }), 'info');
             const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
             outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
             node.data.lastResponse = outputValue;
@@ -296,12 +287,7 @@ async function evaluateNode(node) {
 
       nextFlowPort = isTrue ? 'flow-true' : 'flow-false';
       outputValue = isTrue ? 'TRUE' : 'FALSE';
-      addLog(
-        state.lang === 'en' 
-          ? `Condition evaluated: ${isTrue} (Branch: ${nextFlowPort})` 
-          : `条件分岐判定結果: ${isTrue} (分岐: ${nextFlowPort})`,
-        'info'
-      );
+      addLog(t('cond_evaluated', { result: isTrue, branch: nextFlowPort }), 'info');
       break;
     }
 
@@ -310,7 +296,7 @@ async function evaluateNode(node) {
       const varName = node.data.variableName || 'temp_var';
       setVariable(varName, valIn);
       outputValue = valIn;
-      addLog(state.lang === 'en' ? `Set variable [${varName}] = ${valIn}` : `変数 [${varName}] に値を格納しました: ${valIn}`, 'success');
+      addLog(t('set_var_log', { name: varName, val: valIn }), 'success');
       break;
     }
 

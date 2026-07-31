@@ -26,6 +26,7 @@ import {
 import { runLlmQuery } from './llm.js';
 import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow } from './runtime.js';
 import { drawConnections } from './canvas.js';
+import { t, updateDomTranslations } from './i18n.js';
 
 /**
  * Standard log message wrapper delegating to Model Mutator
@@ -203,7 +204,7 @@ export function renderRecentFilesUI(recentFiles) {
   if (!listEl) return;
 
   if (!recentFiles || recentFiles.length === 0) {
-    listEl.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); padding: 8px 0;">${state.lang === 'en' ? 'No recent files.' : '最近開いたファイルはありません。'}</p>`;
+    listEl.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); padding: 8px 0;">${t('no_recent_files')}</p>`;
     return;
   }
 
@@ -248,7 +249,7 @@ export function loadWorkflowData(data, title = '') {
     Object.entries(data.variables).forEach(([k, v]) => setVariable(k, v));
   }
 
-  addLog(state.lang === 'en' ? `Loaded workflow: ${title || 'Project'}` : `ワークフロー「${title || 'プロジェクト'}」を読み込みました。`, 'success');
+  addLog(t('loaded_workflow', { title: title || 'Project' }), 'success');
 }
 
 export function openSaveProjectModal() {
@@ -299,7 +300,7 @@ export function exportProjectWithMeta(meta) {
     data: projectData
   });
 
-  addLog(state.lang === 'en' ? `Exported project as .fabre file.` : `プロジェクト (.fabre) を保存・ダウンロードしました。`, 'success');
+  addLog(t('exported_fabre'), 'success');
 }
 
 export function importProject(file) {
@@ -322,7 +323,7 @@ export function importProject(file) {
       });
 
     } catch (err) {
-      addLog(state.lang === 'en' ? `Failed to load .fabre file: ${err.message}` : `ファイル読み込み失敗: ${err.message}`, 'error');
+      addLog(t('failed_load_file', { error: err.message }), 'error');
     }
   };
   reader.readAsText(file);
@@ -373,7 +374,7 @@ export function initProjectFileControls() {
       state.recentFiles = [];
       try { localStorage.removeItem('fabre_recent_files'); } catch (e) {}
       state.emit('recentFilesChanged', state.recentFiles);
-      addLog(state.lang === 'en' ? 'Cleared recent files history.' : '最近開いたファイルの履歴をクリアしました。', 'info');
+      addLog(t('log_cleared_recent'), 'info');
     });
   }
 }
