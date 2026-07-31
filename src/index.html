@@ -37,6 +37,15 @@
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span data-i18n="btn_connect_dir">Connect Directory</span>
         </button>
+        <button id="export-project-btn" class="btn btn-secondary btn-sm" title="Save workflow to JSON file">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span data-i18n="btn_export_project">Save Project</span>
+        </button>
+        <button id="import-project-btn" class="btn btn-secondary btn-sm" title="Load workflow from JSON file">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <span data-i18n="btn_import_project">Load Project</span>
+        </button>
+        <input type="file" id="import-project-input" accept=".json" style="display: none;">
       </div>
     </header>
 
@@ -184,6 +193,10 @@
                 <button id="template-code-loop" class="template-btn">
                   <h5 data-i18n="preset_loop_title">Self-Debugging Agent Loop</h5>
                   <p data-i18n="preset_loop_desc">ローカルコードを検証し、テスト結果をフィードバックしてバグを自己修正するループフロー。</p>
+                </button>
+                <button id="template-condition-branch" class="template-btn">
+                  <h5 data-i18n="preset_cond_title">Condition Branching & Flow</h5>
+                  <p data-i18n="preset_cond_desc">条件判定による成功・失敗ポートへの動的フロー制御デモ。</p>
                 </button>
                 <button id="template-basic-chat" class="template-btn">
                   <h5 data-i18n="preset_chat_title">Simple Chat with Memory</h5>

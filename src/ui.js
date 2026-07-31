@@ -9,6 +9,11 @@ import {
   setLanguage,
   setTheme,
   setLlmProvider,
+  addNode,
+  addLink,
+  clearCanvasState,
+  resetRunner,
+  setVariable,
   updateNodeTitle,
   updateNodeData,
   setSelectedNode,
@@ -181,6 +186,296 @@ export function initRunnerControls() {
       const delay = parseInt(e.target.value, 10);
       setExecutionDelay(delay);
       if (delayLabel) delayLabel.innerText = `${delay}ms`;
+    });
+  }
+}
+
+export function loadPreset(presetName) {
+  clearCanvasState();
+  resetRunner();
+
+  if (presetName === 'code-loop') {
+    const node1 = {
+      id: 'node_start_1',
+      type: NODE_TYPES.START,
+      title: 'Start Node',
+      x: 60,
+      y: 160,
+      width: 240,
+      height: 140,
+      data: { inputValue: 'function sum(arr) { return arr.reduce((a,b)=>a+b); }' }
+    };
+    const node2 = {
+      id: 'node_prompt_1',
+      type: NODE_TYPES.PROMPT,
+      title: 'Prompt Builder',
+      x: 350,
+      y: 160,
+      width: 300,
+      height: 170,
+      data: { promptTemplate: 'Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case.' }
+    };
+    const node3 = {
+      id: 'node_llm_1',
+      type: NODE_TYPES.LLM,
+      title: 'LLM Call',
+      x: 700,
+      y: 160,
+      width: 280,
+      height: 170,
+      data: { systemPrompt: 'You are a Software Auditor.', temperature: 0.7, enableTools: true }
+    };
+    const node4 = {
+      id: 'node_tool_1',
+      type: NODE_TYPES.TOOL,
+      title: 'Tool Exec',
+      x: 1030,
+      y: 160,
+      width: 260,
+      height: 170,
+      data: { toolType: 'mock_test' }
+    };
+    const node5 = {
+      id: 'node_setvar_1',
+      type: NODE_TYPES.SET_VAR,
+      title: 'Set Var',
+      x: 1340,
+      y: 160,
+      width: 250,
+      height: 170,
+      data: { variableName: 'audit_result' }
+    };
+    const node6 = {
+      id: 'node_output_1',
+      type: NODE_TYPES.OUTPUT,
+      title: 'Output Node',
+      x: 1640,
+      y: 160,
+      width: 240,
+      height: 170,
+      data: {}
+    };
+
+    addNode(node1);
+    addNode(node2);
+    addNode(node3);
+    addNode(node4);
+    addNode(node5);
+    addNode(node6);
+
+    // Add Flow links
+    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f4', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f5', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' });
+
+    // Add Data links
+    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' });
+    addLink({ id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' });
+    addLink({ id: 'link_d3', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' });
+    addLink({ id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' });
+
+    addLog(state.lang === 'en' ? 'Loaded preset: Self-Debugging Agent Loop' : 'プリセット「自己デバッグループ」を読み込みました。', 'success');
+  } else if (presetName === 'condition-branch') {
+    const node1 = {
+      id: 'node_start_1',
+      type: NODE_TYPES.START,
+      title: 'Start Node',
+      x: 60,
+      y: 180,
+      width: 240,
+      height: 140,
+      data: { inputValue: 'TEST PASS' }
+    };
+    const node2 = {
+      id: 'node_cond_1',
+      type: NODE_TYPES.CONDITION,
+      title: 'Condition Check',
+      x: 350,
+      y: 180,
+      width: 270,
+      height: 170,
+      data: { conditionType: 'contains', conditionValue: 'PASS' }
+    };
+    const node3 = {
+      id: 'node_out_pass',
+      type: NODE_TYPES.OUTPUT,
+      title: 'Output (Pass)',
+      x: 680,
+      y: 80,
+      width: 240,
+      height: 170,
+      data: {}
+    };
+    const node4 = {
+      id: 'node_out_fail',
+      type: NODE_TYPES.OUTPUT,
+      title: 'Output (Fail)',
+      x: 680,
+      y: 280,
+      width: 240,
+      height: 170,
+      data: {}
+    };
+
+    addNode(node1);
+    addNode(node2);
+    addNode(node3);
+    addNode(node4);
+
+    // Add Flow links
+    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f2', fromNode: 'node_cond_1', fromPort: 'flow-true', toNode: 'node_out_pass', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f3', fromNode: 'node_cond_1', fromPort: 'flow-false', toNode: 'node_out_fail', toPort: 'flow-in', type: 'flow' });
+
+    // Add Data links
+    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_cond_1', toPort: 'text-in', type: 'data' });
+    addLink({ id: 'link_d2', fromNode: 'node_cond_1', fromPort: 'data-out', toNode: 'node_out_pass', toPort: 'text-in', type: 'data' });
+
+    addLog(state.lang === 'en' ? 'Loaded preset: Condition Branching & Flow' : 'プリセット「条件分岐デモ」を読み込みました。', 'success');
+  } else if (presetName === 'basic-chat') {
+    const node1 = {
+      id: 'node_start_1',
+      type: NODE_TYPES.START,
+      title: 'Start Node',
+      x: 60,
+      y: 160,
+      width: 240,
+      height: 140,
+      data: { inputValue: 'What is WebAssembly?' }
+    };
+    const node2 = {
+      id: 'node_prompt_1',
+      type: NODE_TYPES.PROMPT,
+      title: 'Prompt Builder',
+      x: 350,
+      y: 160,
+      width: 300,
+      height: 170,
+      data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' }
+    };
+    const node3 = {
+      id: 'node_llm_1',
+      type: NODE_TYPES.LLM,
+      title: 'LLM Call',
+      x: 700,
+      y: 160,
+      width: 280,
+      height: 170,
+      data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 }
+    };
+    const node4 = {
+      id: 'node_setvar_1',
+      type: NODE_TYPES.SET_VAR,
+      title: 'Set Var',
+      x: 1030,
+      y: 160,
+      width: 250,
+      height: 170,
+      data: { variableName: 'chat_history' }
+    };
+    const node5 = {
+      id: 'node_output_1',
+      type: NODE_TYPES.OUTPUT,
+      title: 'Output Node',
+      x: 1330,
+      y: 160,
+      width: 240,
+      height: 170,
+      data: {}
+    };
+
+    addNode(node1);
+    addNode(node2);
+    addNode(node3);
+    addNode(node4);
+    addNode(node5);
+
+    // Add Flow links
+    addLink({ id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'link_f4', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' });
+
+    // Add Data links
+    addLink({ id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' });
+    addLink({ id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' });
+    addLink({ id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' });
+    addLink({ id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' });
+
+    addLog(state.lang === 'en' ? 'Loaded preset: Simple Chat with Memory' : 'プリセット「シンプルチャット」を読み込みました。', 'success');
+  }
+}
+
+export function initPresetControls() {
+  const codeLoopBtn = document.getElementById('template-code-loop');
+  if (codeLoopBtn) codeLoopBtn.addEventListener('click', () => loadPreset('code-loop'));
+
+  const condBranchBtn = document.getElementById('template-condition-branch');
+  if (condBranchBtn) condBranchBtn.addEventListener('click', () => loadPreset('condition-branch'));
+
+  const basicChatBtn = document.getElementById('template-basic-chat');
+  if (basicChatBtn) basicChatBtn.addEventListener('click', () => loadPreset('basic-chat'));
+}
+
+export function exportProject() {
+  const projectData = {
+    version: '0.1.0',
+    timestamp: new Date().toISOString(),
+    nodes: state.nodes,
+    links: state.links,
+    variables: state.variables
+  };
+  const jsonStr = JSON.stringify(projectData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fabre-workflow-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog(state.lang === 'en' ? 'Exported project workflow JSON.' : 'プロジェクトワークフロー (JSON) を保存・ダウンロードしました。', 'success');
+}
+
+export function importProject(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.nodes || !data.links) {
+        throw new Error('Invalid Fabre workflow JSON format.');
+      }
+      clearCanvasState();
+      resetRunner();
+
+      (data.nodes || []).forEach(n => addNode(n));
+      (data.links || []).forEach(l => addLink(l));
+      if (data.variables) {
+        Object.entries(data.variables).forEach(([k, v]) => setVariable(k, v));
+      }
+
+      addLog(state.lang === 'en' ? 'Successfully loaded project workflow JSON.' : 'プロジェクトワークフロー (JSON) を正常に読み込みました。', 'success');
+    } catch (err) {
+      addLog(state.lang === 'en' ? `Failed to load JSON: ${err.message}` : `JSON読み込み失敗: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+export function initProjectFileControls() {
+  const exportBtn = document.getElementById('export-project-btn');
+  if (exportBtn) exportBtn.addEventListener('click', exportProject);
+
+  const importBtn = document.getElementById('import-project-btn');
+  const importInput = document.getElementById('import-project-input');
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        importProject(e.target.files[0]);
+        importInput.value = '';
+      }
     });
   }
 }

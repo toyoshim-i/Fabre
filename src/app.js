@@ -28,6 +28,8 @@ import {
   initTabs, 
   initUiListeners, 
   initRunnerControls,
+  initPresetControls,
+  initProjectFileControls,
   initSettingsUI, 
   updateVariablesUI 
 } from './ui.js';
@@ -36,6 +38,8 @@ function initEvents() {
   // Sidebar tabs nav
   initTabs();
   initRunnerControls();
+  initPresetControls();
+  initProjectFileControls();
   
   // Language switcher
   const langSelect = document.getElementById('settings-language');

@@ -1,0 +1,92 @@
+{
+  "version": "0.1.0",
+  "timestamp": "2026-07-31T12:00:00.000Z",
+  "nodes": [
+    {
+      "id": "node_start_1",
+      "type": "start",
+      "title": "Start Node",
+      "x": 60,
+      "y": 160,
+      "width": 240,
+      "height": 140,
+      "data": {
+        "inputValue": "function sum(arr) { return arr.reduce((a,b)=>a+b); }"
+      }
+    },
+    {
+      "id": "node_prompt_1",
+      "type": "prompt",
+      "title": "Prompt Builder",
+      "x": 350,
+      "y": 160,
+      "width": 300,
+      "height": 170,
+      "data": {
+        "promptTemplate": "Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case."
+      }
+    },
+    {
+      "id": "node_llm_1",
+      "type": "llm",
+      "title": "LLM Call",
+      "x": 700,
+      "y": 160,
+      "width": 280,
+      "height": 170,
+      "data": {
+        "systemPrompt": "You are a Senior Engineer.",
+        "temperature": 0.7,
+        "enableTools": true
+      }
+    },
+    {
+      "id": "node_tool_1",
+      "type": "tool",
+      "title": "Tool Exec",
+      "x": 1030,
+      "y": 160,
+      "width": 260,
+      "height": 170,
+      "data": {
+        "toolType": "mock_test"
+      }
+    },
+    {
+      "id": "node_setvar_1",
+      "type": "set_var",
+      "title": "Set Var",
+      "x": 1340,
+      "y": 160,
+      "width": 250,
+      "height": 170,
+      "data": {
+        "variableName": "audit_result"
+      }
+    },
+    {
+      "id": "node_output_1",
+      "type": "output",
+      "title": "Output Node",
+      "x": 1640,
+      "y": 160,
+      "width": 240,
+      "height": 170,
+      "data": {}
+    }
+  ],
+  "links": [
+    { "id": "link_f1", "fromNode": "node_start_1", "fromPort": "flow-out", "toNode": "node_prompt_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f2", "fromNode": "node_prompt_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_tool_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f4", "fromNode": "node_tool_1", "fromPort": "flow-out", "toNode": "node_setvar_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f5", "fromNode": "node_setvar_1", "fromPort": "flow-out", "toNode": "node_output_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_d1", "fromNode": "node_start_1", "fromPort": "data-out", "toNode": "node_prompt_1", "toPort": "data-in", "type": "data" },
+    { "id": "link_d2", "fromNode": "node_prompt_1", "fromPort": "prompt-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
+    { "id": "link_d3", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_setvar_1", "toPort": "value-in", "type": "data" },
+    { "id": "link_d4", "fromNode": "node_setvar_1", "fromPort": "value-out", "toNode": "node_output_1", "toPort": "text-in", "type": "data" }
+  ],
+  "variables": {
+    "audit_result": ""
+  }
+}
