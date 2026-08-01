@@ -235,6 +235,38 @@ export function resetRunner() {
 
 export const DEFAULT_RECENT_FILES = [
   {
+    id: 'sample_js_sandbox_alert',
+    title: 'JS Sandbox Browser Alert Agent',
+    description: 'Interactive workflow executing JS Sandbox tool calls for browser alert dialog popups and JS evaluation.',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'JS Sandbox Browser Alert Agent',
+        description: 'Interactive workflow executing JS Sandbox tool calls for browser alert dialog popups and JS evaluation.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Request Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: "alert('HELLO')" } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'JS Code Generator', x: 370, y: 160, width: 310, height: 170, data: { promptTemplate: "alert('HELLO')" } },
+        { id: 'node_tool_1', type: 'tool', title: 'JS Sandbox Exec', x: 730, y: 160, width: 280, height: 170, data: { toolType: 'js_sandbox' } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 1060, y: 160, width: 280, height: 220, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_tool_1', toPort: 'data-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_tool_1', fromPort: 'data-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
+      ],
+      variables: {}
+    }
+  },
+  {
     id: 'sample_chat_e2e',
     title: 'End-to-End Infinite Chat',
     description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
