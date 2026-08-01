@@ -276,21 +276,61 @@ async function evaluateNode(node) {
       const promptInput = getPortInputValue(node.id, 'prompt-in') || node.data.lastCompiledPrompt || '';
       const systemPrompt = node.data.systemPrompt || 'You are a helpful software engineer assistant.';
       const temp = node.data.temperature !== undefined ? node.data.temperature : 0.7;
+      const requireToolCall = node.data.requireToolCall || false;
+      const maxRetries = node.data.maxRetries || 3;
+
+      const llmOptions = {
+        enableTools: node.data.enableTools || false,
+        tools: node.data.tools || null,
+        returnStructured: true
+      };
 
       try {
-        outputValue = await runLlmQuery(systemPrompt, promptInput, temp);
-        node.data.lastResponse = outputValue;
-        
-        // ReAct pattern check if tool execution enabled
-        if (node.data.enableTools) {
-          const reactMatch = parseReActToolCall(outputValue);
-          if (reactMatch) {
-            addLog(t('react_tool_detected', { tool: reactMatch.tool }), 'info');
-            const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
-            outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
-            node.data.lastResponse = outputValue;
+        let currentPrompt = promptInput;
+        let lastResult = null;
+
+        for (let attempt = 0; attempt <= (requireToolCall ? maxRetries : 0); attempt++) {
+          lastResult = await runLlmQuery(systemPrompt, currentPrompt, temp, null, llmOptions);
+          outputValue = lastResult.content || '';
+
+          // 1. Structured Function Calling (OpenAI / Tool Calls schema)
+          if (lastResult.type === 'tool_calls' && lastResult.tool_calls.length > 0) {
+            addLog(t('react_tool_detected', { tool: lastResult.tool_calls[0].function?.name || 'MCP Tool' }), 'info');
+            for (const call of lastResult.tool_calls) {
+              const toolName = call.function.name;
+              const toolArgs = call.function.arguments;
+              const toolResult = await executeLocalTool(`mcp:${toolName}`, toolArgs);
+              outputValue += `\n\n[Tool Output: ${toolName}]\n${toolResult}`;
+            }
+            break;
           }
+
+          // 2. ReAct Pattern Regex Check (Fallback for non-native function call models)
+          if (node.data.enableTools) {
+            const reactMatch = parseReActToolCall(outputValue);
+            if (reactMatch) {
+              addLog(t('react_tool_detected', { tool: reactMatch.tool }), 'info');
+              const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
+              outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
+              break;
+            }
+          }
+
+          // 3. Plain text returned when tool call was required
+          if (requireToolCall) {
+            if (attempt < maxRetries) {
+              addLog(t('llm_retry_tool_required', { attempt: attempt + 1, max: maxRetries }), 'warning');
+              currentPrompt = `${promptInput}\n\n[SYSTEM DIRECTIVE]: You returned plain text, but a tool call is required to process this request. You MUST call one of the provided tools now. Do not reply with text alone.`;
+              continue;
+            } else {
+              throw new Error(`LLM failed to issue a required Tool Call after ${maxRetries} retry attempts. Response received: "${outputValue}"`);
+            }
+          }
+
+          break;
         }
+
+        node.data.lastResponse = outputValue;
         nextFlowPort = 'flow-success';
       } catch (err) {
         nextFlowPort = 'flow-error';

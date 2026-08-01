@@ -640,6 +640,10 @@ export function showNodeProperties(nodeId) {
         <label for="prop-llm-tools">${t.prop_llm_tools}</label>
         <input type="checkbox" id="prop-llm-tools" ${node.data.enableTools ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
       </div>
+      <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px;">
+        <label for="prop-llm-require-tools">${state.lang === 'en' ? 'Require Tool Call (Retry on Text)' : 'ツール呼び出しを強制（平文時に再試行）'}</label>
+        <input type="checkbox" id="prop-llm-require-tools" ${node.data.requireToolCall ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+      </div>
     `;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
     html += `
@@ -757,6 +761,13 @@ function wirePropertyControls(node) {
   if (toolsCheck) {
     toolsCheck.addEventListener('change', (e) => {
       updateNodeData(node.id, 'enableTools', e.target.checked);
+    });
+  }
+
+  const requireToolsCheck = document.getElementById('prop-llm-require-tools');
+  if (requireToolsCheck) {
+    requireToolsCheck.addEventListener('change', (e) => {
+      updateNodeData(node.id, 'requireToolCall', e.target.checked);
     });
   }
 

@@ -49,6 +49,7 @@ export const DICTIONARY = {
   mcp_connected_success: { en: 'Connected to MCP server [{name}] ({count} tools discovered)', ja: 'MCP サーバー [{name}] に接続しました ({count} 個のツールを発見)' },
   mcp_connect_failed: { en: 'Failed to connect to MCP server [{name}]: {error}', ja: 'MCP サーバー [{name}] への接続に失敗しました: {error}' },
   mcp_executing_tool: { en: 'Executing MCP Tool [{tool}] on {url}...', ja: 'MCP ツール [{tool}] を {url} で実行中...' },
+  llm_retry_tool_required: { en: 'LLM returned plain text instead of a tool call. Retrying with directive (Attempt {attempt}/{max})...', ja: 'LLMがツール呼び出しではなく平文を返却しました。指示を強化して再試行中 (試行 {attempt}/{max})...' },
 
   // Execution Debugger Controls
   runner_control_title: { en: 'Execution Control', ja: 'ワークフロー実行制御' },

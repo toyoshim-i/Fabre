@@ -380,4 +380,13 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(state.mcpTools.length, 0);
   });
 
+  await t.test('should enforce requireToolCall and set runnerState to error when plain text returned', async () => {
+    clearCanvasState();
+    resetRunner();
+    addNode({ id: 'llm1', type: NODE_TYPES.LLM, title: 'LLM Call', data: { requireToolCall: true, maxRetries: 1 } });
+    state.currentNodeId = 'llm1';
+    await stepWorkflow();
+    assert.strictEqual(state.runnerState, 'error');
+  });
+
 });

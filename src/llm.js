@@ -255,16 +255,20 @@ export function normalizeToCanonicalMessages(input, systemPrompt = '') {
   return messages;
 }
 
+import { getMcpToolsForOpenAi } from './mcp.js';
+
 /**
  * Execute an LLM query string and wait for response
  * @param {string} systemPrompt System Instructions
  * @param {string} userPrompt User Prompt
  * @param {number} temperature Temperature settings parameter
  * @param {AbortSignal} signal AbortSignal signal
- * @returns {Promise<string>} Content response from LLM
+ * @param {object} options Options (tools, enableTools, returnStructured)
+ * @returns {Promise<string|object>} Content response or structured object from LLM
  */
-export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null) {
+export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null, options = {}) {
   let responseContent = '';
+  let toolCalls = null;
   const canonicalMessages = normalizeToCanonicalMessages(userPrompt, systemPrompt);
 
   if (state.llmProvider === 'chrome-ai') {
@@ -346,6 +350,15 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
       temperature: temperature
     };
 
+    // Inject tool definitions for OpenAI Function Calling if provided or registered via MCP
+    let toolsPayload = options.tools;
+    if (!toolsPayload && options.enableTools && state.mcpTools && state.mcpTools.length > 0) {
+      toolsPayload = getMcpToolsForOpenAi();
+    }
+    if (toolsPayload && Array.isArray(toolsPayload) && toolsPayload.length > 0) {
+      body.tools = toolsPayload;
+    }
+
     const loggedHeaders = { ...headers };
     if (loggedHeaders['Authorization']) {
       loggedHeaders['Authorization'] = 'Bearer ******'; // Mask API Key
@@ -403,10 +416,15 @@ ${JSON.stringify(body, null, 2)}`
     if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
       throw new Error('API returned an empty or invalid chat completion payload.');
     }
-    responseContent = data.choices[0].message.content;
+
+    const messagePayload = data.choices[0].message;
+    responseContent = messagePayload.content || '';
+    if (messagePayload.tool_calls && Array.isArray(messagePayload.tool_calls) && messagePayload.tool_calls.length > 0) {
+      toolCalls = messagePayload.tool_calls;
+    }
   }
 
-  console.log(`[LLM Query Response]\n`, responseContent);
+  console.log(`[LLM Query Response]\n`, responseContent, toolCalls);
 
   log(
     state.lang === 'en' ? 'LLM response received successfully.' : 'LLMからの応答を受信しました。',
