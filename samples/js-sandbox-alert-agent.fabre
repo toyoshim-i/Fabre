@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "meta": {
     "title": "JS Sandbox Browser Alert Agent",
-    "description": "End-to-end AI Agent workflow where LLM generates JavaScript code, Extractor parses the code block, and JS Sandbox executes browser dialogs.",
+    "description": "End-to-end AI Agent workflow where LLM receives English instructions, generates JavaScript code, Extractor parses the code block, and JS Sandbox executes browser dialogs.",
     "author": "Fabre Team",
     "createdAt": "2026-08-01T07:45:00.000Z",
-    "updatedAt": "2026-08-01T08:03:00.000Z"
+    "updatedAt": "2026-08-01T08:04:00.000Z"
   },
   "nodes": [
     {
@@ -18,7 +18,7 @@
       "width": 260,
       "height": 160,
       "data": {
-        "lastEventValue": "ダイアログで HELLO と表示させて！"
+        "lastEventValue": "Display an alert dialog with HELLO!"
       }
     },
     {
@@ -30,7 +30,7 @@
       "width": 310,
       "height": 170,
       "data": {
-        "promptTemplate": "You are a browser automation assistant. Generate executable JavaScript code for the user request.\nUser Request: {{inputValue}}\n\nOutput ONLY a markdown JS code block like:\n```js\nalert('HELLO');\n```"
+        "promptTemplate": "System Instruction:\nYou are a browser automation assistant. Generate executable JavaScript code for the user request.\nUser Request: {{inputValue}}\n\nOutput ONLY a markdown JS code block like:\n```js\nalert('HELLO');\n```"
       }
     },
     {
@@ -42,7 +42,7 @@
       "width": 280,
       "height": 170,
       "data": {
-        "systemPrompt": "You generate executable browser JavaScript code blocks.",
+        "systemPrompt": "You are a professional JavaScript automation assistant.",
         "temperature": 0.2
       }
     },

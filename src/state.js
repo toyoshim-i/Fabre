@@ -248,7 +248,7 @@ export const DEFAULT_RECENT_FILES = [
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Instruction Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'ダイアログで HELLO と表示させて！' } },
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Instruction Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'Display an alert dialog with HELLO!' } },
         { id: 'node_prompt_1', type: 'prompt', title: 'Code Generator Prompt', x: 370, y: 160, width: 310, height: 170, data: { promptTemplate: "You are a browser automation assistant. Generate executable JavaScript code for the user request.\nUser Request: {{inputValue}}\n\nOutput ONLY a markdown JS code block like:\n```js\nalert('HELLO');\n```" } },
         { id: 'node_llm_1', type: 'llm', title: 'LLM Call (Code Gen)', x: 730, y: 160, width: 280, height: 170, data: { systemPrompt: 'You generate executable browser JavaScript code blocks.', temperature: 0.2 } },
         { id: 'node_extractor_1', type: 'extractor', title: 'JS Code Extractor', x: 1060, y: 160, width: 260, height: 170, data: { extractorType: 'code_block' } },
