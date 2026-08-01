@@ -238,6 +238,7 @@ export const DEFAULT_RECENT_FILES = [
     id: 'sample_js_sandbox_alert',
     title: 'JS Sandbox Browser Alert Agent',
     description: 'Interactive workflow executing JS Sandbox tool calls for browser alert dialog popups and JS evaluation.',
+    filePath: '../samples/js-sandbox-alert-agent.fabre',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',
@@ -276,6 +277,7 @@ export const DEFAULT_RECENT_FILES = [
     id: 'sample_chat_e2e',
     title: 'End-to-End Infinite Chat',
     description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
+    filePath: '../samples/e2e-infinite-chat.fabre',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',
@@ -310,6 +312,7 @@ export const DEFAULT_RECENT_FILES = [
     id: 'sample_loop',
     title: 'Self-Debugging Agent Loop',
     description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
+    filePath: '../samples/self-fixing-loop.fabre',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',
@@ -345,6 +348,7 @@ export const DEFAULT_RECENT_FILES = [
     id: 'sample_cond',
     title: 'Condition Branching & Flow',
     description: 'Demonstrates dynamic flow control branching to True / False ports based on text rules.',
+    filePath: '../samples/condition-branching.fabre',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',

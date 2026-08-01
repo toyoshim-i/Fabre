@@ -226,14 +226,30 @@ export function renderRecentFilesUI(recentFiles) {
       </div>
     `;
 
-    card.addEventListener('click', (e) => {
+    card.addEventListener('click', async (e) => {
       if (e.target.classList.contains('recent-file-remove-btn')) {
         e.stopPropagation();
         removeRecentFile(file.id);
         return;
       }
-      if (file.data) {
-        loadWorkflowData(file.data, file.title);
+
+      let workflowData = file.data;
+      if (file.filePath) {
+        try {
+          const res = await fetch(file.filePath);
+          if (res.ok) {
+            workflowData = await res.json();
+            file.data = workflowData;
+            file.updatedAt = new Date().toISOString();
+            addRecentFile(file); // Refresh cached contents
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch fresh workflow from ${file.filePath}:`, err);
+        }
+      }
+
+      if (workflowData) {
+        loadWorkflowData(workflowData, file.title);
       }
     });
 
