@@ -234,16 +234,27 @@ export function normalizeToCanonicalMessages(input, systemPrompt = '') {
       } catch (e) {}
     }
 
-    // Check if input contains multi-turn "User: ... \n Assistant: ..." role annotations
-    if (trimmed.includes('User:') || trimmed.includes('Assistant:')) {
-      const parts = trimmed.split(/(?=User:|Assistant:)/i);
+    // Check if input contains role annotations (User/Assistant/System/Tool)
+    const roleRegex = /(?=(?:User Request|User Input|User|Assistant Reply|Assistant Response|Assistant|System Instruction|System Prompt|System|Tool Output|Tool Result|Tool):)/i;
+    if (roleRegex.test(trimmed)) {
+      const parts = trimmed.split(roleRegex);
       parts.forEach(part => {
         const p = part.trim();
-        if (p.toLowerCase().startsWith('user:')) {
-          messages.push({ role: 'user', content: p.replace(/^user:/i, '').trim() });
-        } else if (p.toLowerCase().startsWith('assistant:')) {
-          messages.push({ role: 'assistant', content: p.replace(/^assistant:/i, '').trim() });
-        } else if (p) {
+        if (!p) return;
+        
+        if (/^(?:System Instruction|System Prompt|System):/i.test(p)) {
+          const sysContent = p.replace(/^(?:System Instruction|System Prompt|System):/i, '').trim();
+          if (sysContent) messages.push({ role: 'system', content: sysContent });
+        } else if (/^(?:User Request|User Input|User):/i.test(p)) {
+          const userContent = p.replace(/^(?:User Request|User Input|User):/i, '').trim();
+          if (userContent) messages.push({ role: 'user', content: userContent });
+        } else if (/^(?:Assistant Reply|Assistant Response|Assistant):/i.test(p)) {
+          const asstContent = p.replace(/^(?:Assistant Reply|Assistant Response|Assistant):/i, '').trim();
+          if (asstContent) messages.push({ role: 'assistant', content: asstContent });
+        } else if (/^(?:Tool Output|Tool Result|Tool):/i.test(p)) {
+          const toolContent = p.replace(/^(?:Tool Output|Tool Result|Tool):/i, '').trim();
+          if (toolContent) messages.push({ role: 'tool', content: toolContent });
+        } else {
           messages.push({ role: 'user', content: p });
         }
       });
@@ -252,10 +263,69 @@ export function normalizeToCanonicalMessages(input, systemPrompt = '') {
     }
   }
 
+  // Deduplicate initial system prompt if system message already parsed
+  if (messages.length > 1 && messages[0].role === 'system' && messages[1].role === 'system') {
+    messages.shift();
+  }
+
   return messages;
 }
 
 import { getMcpToolsForOpenAi } from './mcp.js';
+
+export function getBuiltInToolsForOpenAi() {
+  return [
+    {
+      type: 'function',
+      function: {
+        name: 'js_sandbox',
+        description: 'Execute custom JavaScript code in browser sandbox. Useful for computations, string formatting, or browser dialog alerts like alert("HELLO")',
+        parameters: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'JavaScript code statement or expression to execute' }
+          },
+          required: ['code']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'read_file',
+        description: 'Read text content of a local file in connected directory',
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: { type: 'string', description: 'Relative path or file name' }
+          },
+          required: ['filePath']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'write_file',
+        description: 'Write text content to a local file in connected directory',
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: { type: 'string', description: 'Relative path or file name' },
+            content: { type: 'string', description: 'Text content to write' }
+          },
+          required: ['filePath', 'content']
+        }
+      }
+    }
+  ];
+}
+
+export function getAllAvailableToolsForOpenAi() {
+  const mcpTools = getMcpToolsForOpenAi();
+  const builtInTools = getBuiltInToolsForOpenAi();
+  return [...builtInTools, ...mcpTools];
+}
 
 /**
  * Execute an LLM query string and wait for response
@@ -350,10 +420,10 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
       temperature: temperature
     };
 
-    // Inject tool definitions for OpenAI Function Calling if provided or registered via MCP
+    // Inject tool definitions for OpenAI Function Calling if provided or enabled
     let toolsPayload = options.tools;
-    if (!toolsPayload && options.enableTools && state.mcpTools && state.mcpTools.length > 0) {
-      toolsPayload = getMcpToolsForOpenAi();
+    if (!toolsPayload && options.enableTools) {
+      toolsPayload = getAllAvailableToolsForOpenAi();
     }
     if (toolsPayload && Array.isArray(toolsPayload) && toolsPayload.length > 0) {
       body.tools = toolsPayload;

@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "meta": {
     "title": "JS Sandbox Browser Alert Agent",
-    "description": "End-to-end AI Agent workflow where LLM receives English instructions, generates JavaScript code, Extractor parses the code block, and JS Sandbox executes browser dialogs.",
+    "description": "End-to-end AI Agent workflow featuring LLM Code Generation, Function Calling Tools, Error Handling flow-error routing, and JS Sandbox execution.",
     "author": "Fabre Team",
     "createdAt": "2026-08-01T07:45:00.000Z",
-    "updatedAt": "2026-08-01T08:04:00.000Z"
+    "updatedAt": "2026-08-01T08:18:00.000Z"
   },
   "nodes": [
     {
@@ -43,8 +43,20 @@
       "height": 170,
       "data": {
         "systemPrompt": "You are a professional JavaScript automation assistant.",
-        "temperature": 0.2
+        "temperature": 0.2,
+        "enableTools": true,
+        "requireToolCall": false
       }
+    },
+    {
+      "id": "node_error_stream",
+      "type": "stream_view",
+      "title": "LLM Error Handler",
+      "x": 730,
+      "y": 390,
+      "width": 280,
+      "height": 180,
+      "data": {}
     },
     {
       "id": "node_extractor_1",
@@ -85,6 +97,7 @@
     { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_prompt_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f2", "fromNode": "node_prompt_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_extractor_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_ferr", "fromNode": "node_llm_1", "fromPort": "flow-error", "toNode": "node_error_stream", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f4", "fromNode": "node_extractor_1", "fromPort": "flow-out", "toNode": "node_tool_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f5", "fromNode": "node_tool_1", "fromPort": "flow-out", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f6", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
@@ -92,6 +105,7 @@
     { "id": "link_d2", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" },
     { "id": "link_d3", "fromNode": "node_prompt_1", "fromPort": "prompt-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
     { "id": "link_d4", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_extractor_1", "toPort": "text-in", "type": "data" },
+    { "id": "link_derr", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_error_stream", "toPort": "text-in", "type": "data" },
     { "id": "link_d5", "fromNode": "node_extractor_1", "fromPort": "extracted-out", "toNode": "node_tool_1", "toPort": "data-in", "type": "data" },
     { "id": "link_d6", "fromNode": "node_tool_1", "fromPort": "data-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" }
   ],
