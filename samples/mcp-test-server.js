@@ -2,7 +2,7 @@
 // Run with: node samples/mcp-test-server.js
 // Endpoint: http://localhost:3000/mcp
 
-const http = require('http');
+import http from 'node:http';
 
 const PORT = 3000;
 
