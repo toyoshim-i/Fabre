@@ -555,8 +555,15 @@ export async function executeLocalTool(toolType, inputVal) {
 
   if (toolType === 'js_sandbox') {
     try {
-      const result = new Function('input', 'variables', `return ${inputVal};`)(inputVal, state.variables);
-      return String(result);
+      let result;
+      try {
+        const fn = new Function('input', 'variables', `return (${inputVal});`);
+        result = fn(inputVal, state.variables);
+      } catch (exprErr) {
+        const fn = new Function('input', 'variables', inputVal);
+        result = fn(inputVal, state.variables);
+      }
+      return result !== undefined ? String(result) : 'JS executed successfully (no return value)';
     } catch (e) {
       return `JS Execution Error: ${e.message}`;
     }
