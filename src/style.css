@@ -246,11 +246,12 @@ body.theme-light-slate .status-badge.info {
 
 /* Workspace Layout */
 #workspace-container {
-  display: grid;
-  grid-template-columns: 280px 1fr 420px;
+  display: flex;
+  flex-direction: row;
   height: 100%;
   width: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 /* Panel Header styling */
@@ -289,6 +290,8 @@ body.theme-light-slate .status-badge.info {
 
 /* Left Sidebar (Palette) */
 #palette-sidebar {
+  width: 280px;
+  flex-shrink: 0;
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   backdrop-filter: var(--glass-blur);
@@ -418,7 +421,9 @@ body.theme-light-slate .file-item.active {
 }
 
 /* Center Canvas Area */
-#canvas-area {
+#canvas-container {
+  flex: 1;
+  min-width: 0;
   position: relative;
   height: 100%;
   width: 100%;
@@ -839,8 +844,44 @@ body.theme-light-slate .control-btn:hover {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+/* Sidebar Drag Resizer Handle */
+.sidebar-resizer {
+  width: 6px;
+  height: 100%;
+  background-color: transparent;
+  border-left: 1px solid var(--border-color);
+  cursor: col-resize;
+  position: relative;
+  z-index: 25;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  user-select: none;
+  touch-action: none;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.dragging {
+  background-color: var(--primary);
+  border-color: var(--primary-glow);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+body.dragging-resizer {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.dragging-resizer * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
 /* Right Sidebar (Tabs & Inspector) */
 #inspector-sidebar {
+  width: 340px;
+  min-width: 220px;
+  max-width: 800px;
+  flex-shrink: 0;
   background-color: var(--bg-sidebar);
   border-left: 1px solid var(--border-color);
   backdrop-filter: var(--glass-blur);
@@ -848,6 +889,7 @@ body.theme-light-slate .control-btn:hover {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
   transition: background-color var(--transition-normal), border var(--transition-normal);
 }
 

@@ -30,6 +30,7 @@ import {
   applyLanguage, 
   applyTheme, 
   initTabs, 
+  initSidebarResizer,
   initUiListeners, 
   initRunnerControls,
   initProjectFileControls,
@@ -38,8 +39,9 @@ import {
 } from './ui.js';
 
 function initEvents() {
-  // Sidebar tabs nav
+  // Sidebar tabs nav & mouse resizer
   initTabs();
+  initSidebarResizer();
   initRunnerControls();
   initProjectFileControls();
   

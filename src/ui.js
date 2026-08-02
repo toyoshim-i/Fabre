@@ -79,6 +79,62 @@ export function initTabs() {
 }
 
 /**
+ * Initialize Sidebar Mouse Drag Resizer
+ */
+export function initSidebarResizer() {
+  const resizer = document.getElementById('sidebar-resizer');
+  const sidebar = document.getElementById('inspector-sidebar');
+  if (!resizer || !sidebar) return;
+
+  // Restore saved width from localStorage
+  const savedWidth = localStorage.getItem('fabre_sidebar_width');
+  if (savedWidth) {
+    const parsedWidth = parseInt(savedWidth, 10);
+    if (!isNaN(parsedWidth) && parsedWidth >= 220 && parsedWidth <= 800) {
+      sidebar.style.width = `${parsedWidth}px`;
+    }
+  }
+
+  let startX = 0;
+  let startWidth = 0;
+  let isResizing = false;
+
+  const onMouseMove = (e) => {
+    if (!isResizing) return;
+    const dx = startX - e.clientX;
+    const maxAllowedWidth = Math.min(800, window.innerWidth - 300);
+    const newWidth = Math.min(Math.max(startWidth + dx, 220), maxAllowedWidth);
+    sidebar.style.width = `${newWidth}px`;
+    localStorage.setItem('fabre_sidebar_width', newWidth);
+    
+    // Dynamically update SVG links as sidebar width resizes
+    drawConnections();
+  };
+
+  const onMouseUp = () => {
+    if (isResizing) {
+      isResizing = false;
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('dragging-resizer');
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      drawConnections();
+    }
+  };
+
+  resizer.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.classList.add('dragging-resizer');
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
+  });
+}
+
+/**
  * Initialize reactive listeners for UI updates
  */
 export function initUiListeners() {
