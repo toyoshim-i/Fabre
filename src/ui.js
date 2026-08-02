@@ -445,58 +445,19 @@ export function initProjectFileControls() {
  * Update Language DOM representation
  */
 function updateLanguageUI(langCode) {
-  const t = TRANSLATIONS[langCode];
-  if (!t) return;
-  
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key]) {
-      if (el.children.length > 0) {
-        let textNode = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-        if (textNode) {
-          textNode.nodeValue = ' ' + t[key];
-        } else {
-          el.appendChild(document.createTextNode(' ' + t[key]));
-        }
-      } else {
-        el.innerText = t[key];
-      }
-    }
-  });
-
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    const key = el.getAttribute('data-i18n-title');
-    if (t[key]) el.setAttribute('title', t[key]);
-  });
+  updateDomTranslations();
   
   const select = document.getElementById('settings-language');
   if (select) select.value = langCode;
   
   log(langCode === 'en' ? 'Language switched to English.' : '言語が日本語に切り替わりました。', 'info');
   
-  // Re-render properties panel to apply language changes if visible
+  // Re-render properties panel and recent files to apply language changes
   if (state.selectedNodeId) {
     showNodeProperties(state.selectedNodeId);
   }
-  
-  // Re-render all canvas cards with localized strings
-  state.nodes.forEach(node => {
-    const cardEl = document.getElementById(node.id);
-    if (cardEl) {
-      cardEl.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (t[key]) el.innerText = t[key];
-      });
-      const cardTitleSpan = cardEl.querySelector('.node-title span:last-child');
-      if (cardTitleSpan) {
-        const defaultTitle = TRANSLATIONS[state.lang][`node_${node.type}`] || node.type;
-        if (node.title === TRANSLATIONS[langCode === 'en' ? 'ja' : 'en'][`node_${node.type}`] || node.title === defaultTitle) {
-          node.title = defaultTitle;
-          cardTitleSpan.innerText = defaultTitle;
-        }
-      }
-    }
-  });
+  renderRecentFilesUI(state.recentFiles);
+  document.querySelectorAll('.node-card').forEach(card => applyLanguageToNodeCard(card));
 }
 
 /**
