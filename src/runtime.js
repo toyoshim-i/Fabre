@@ -484,8 +484,13 @@ export async function evaluateNode(node) {
         nextFlowPort = 'flow-success';
       } catch (err) {
         addLog(`[Error in LLM Call ${node.title}]: ${err.message}`, 'error', err.stack);
-        nextFlowPort = 'flow-error';
-        throw err;
+        const hasErrorLink = state.links.some(l => l.fromNode === node.id && l.fromPort === 'flow-error');
+        if (hasErrorLink) {
+          nextFlowPort = 'flow-error';
+          outputValue = `Error: ${err.message}`;
+        } else {
+          throw err;
+        }
       }
       break;
     }
