@@ -101,9 +101,7 @@ export async function runWorkflow() {
     
     await stepWorkflow();
 
-    if (state.runnerState === 'running' || state.runnerState === 'paused') {
-      // Keep running continuously if user did not press pause/error
-      setRunnerState('running');
+    if (state.runnerState === 'running') {
       stepTimer = setTimeout(loop, Math.max(50, state.executionDelay));
     }
   };

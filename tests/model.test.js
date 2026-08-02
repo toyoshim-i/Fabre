@@ -467,4 +467,27 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(state.variables.test_var, 'hello');
   });
 
+  await t.test('should trigger node event and resume workflow execution cleanly', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    const evtNode = { id: 'evt1', type: NODE_TYPES.EVENT_WAIT, title: 'User Input Event', data: {} };
+    const outNode = { id: 'out1', type: NODE_TYPES.OUTPUT, title: 'Output', data: {} };
+    addNode(evtNode);
+    addNode(outNode);
+    addLink({ id: 'l1', fromNode: 'evt1', fromPort: 'flow-out', toNode: 'out1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l2', fromNode: 'evt1', fromPort: 'data-out', toNode: 'out1', toPort: 'text-in', type: 'data' });
+
+    const { triggerNodeEvent, evaluateNode } = await import('../src/runtime.js');
+
+    // First evaluation without event payload pauses workflow
+    const firstRes = await evaluateNode(state.nodes.find(n => n.id === 'evt1'));
+    assert.strictEqual(firstRes.nextFlowPort, null);
+    assert.strictEqual(state.runnerState, 'paused');
+
+    // Triggering event sets payload and advances
+    await triggerNodeEvent('evt1', 'My Custom Event Input');
+    assert.strictEqual(evtNode.data.lastEventValue, 'My Custom Event Input');
+  });
+
 });

@@ -20,6 +20,7 @@ import {
   clearCanvasState
 } from './state.js';
 import { log, showNodeProperties, openPromptEditor } from './ui.js';
+import { triggerNodeEvent } from './runtime.js';
 
 export function updateCanvasTransform() {
   const canvas = document.getElementById('node-canvas');
@@ -410,17 +411,28 @@ function setupNodeEvents(cardEl, node) {
     e.stopPropagation();
   });
 
-  // Send Event Button for event_wait node
+  // Send Event Button and Enter key listener for event_wait node
   const sendEventBtn = cardEl.querySelector('.send-event-btn');
+  const eventInputEl = cardEl.querySelector('[data-prop="eventInput"]');
+
+  const triggerEventFromCard = () => {
+    const val = eventInputEl ? eventInputEl.value.trim() : '';
+    const payload = val || node.data.lastEventValue || 'Event Triggered';
+    triggerNodeEvent(node.id, payload);
+  };
+
   if (sendEventBtn) {
     sendEventBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const inputEl = cardEl.querySelector('[data-prop="eventInput"]');
-      const val = inputEl ? inputEl.value.trim() : '';
-      if (val) {
-        import('./runtime.js').then(module => {
-          module.triggerNodeEvent(node.id, val);
-        });
+      triggerEventFromCard();
+    });
+  }
+
+  if (eventInputEl) {
+    eventInputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        triggerEventFromCard();
       }
     });
   }
