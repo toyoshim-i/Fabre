@@ -131,6 +131,9 @@ export function resetWorkflow() {
     clearTimeout(stepTimer);
     stepTimer = null;
   }
+  state.nodes.forEach(n => {
+    if (n.data) delete n.data.hasLoggedWait;
+  });
   resetRunner();
   addLog(t('workflow_reset'), 'info');
 }
@@ -573,9 +576,13 @@ export async function evaluateNode(node) {
     case NODE_TYPES.EVENT_WAIT: {
       if (!node.data.pendingEventPayload) {
         setRunnerState('paused');
-        addLog(state.lang === 'en' ? `Node [${node.title}] is waiting for event input...` : `ノード [${node.title}] はイベント入力を待機しています...`, 'warning');
+        if (!node.data.hasLoggedWait) {
+          addLog(state.lang === 'en' ? `Node [${node.title}] is waiting for event input...` : `ノード [${node.title}] はイベント入力を待機しています...`, 'warning');
+          node.data.hasLoggedWait = true;
+        }
         return { nextFlowPort: null, outputValue: '' };
       }
+      delete node.data.hasLoggedWait;
       outputValue = node.data.pendingEventPayload;
       node.data.lastEventValue = outputValue;
       delete node.data.pendingEventPayload;
