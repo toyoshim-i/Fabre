@@ -192,17 +192,6 @@
               </div>
             </div>
 
-            <!-- Recent Files Section -->
-            <div class="recent-files-section">
-              <div class="recent-files-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h4 data-i18n="recent_files_title">Recent Files</h4>
-                <button id="clear-recent-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;">Clear</button>
-              </div>
-              <div id="recent-files-list" class="recent-files-list">
-                <!-- Dynamically populated recent file cards -->
-              </div>
-            </div>
-
             <!-- Node Property Settings (Contextual details for selected node) -->
             <div id="node-properties-section" class="properties-section collapsed">
               <div class="properties-header">
@@ -215,9 +204,20 @@
             </div>
           </div>
 
-          <!-- Files Explorer Panel -->
+          <!-- Files & Projects Explorer Panel -->
           <div id="tab-files" class="tab-content">
-            <div class="panel-section-header">
+            <!-- Recent Projects Section -->
+            <div class="recent-files-section" style="margin-bottom: 16px;">
+              <div class="recent-files-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 data-i18n="recent_projects_title">Recent Projects</h4>
+                <button id="clear-recent-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;">Clear</button>
+              </div>
+              <div id="recent-files-list" class="recent-files-list">
+                <!-- Dynamically populated recent project cards -->
+              </div>
+            </div>
+
+            <div class="panel-section-header border-top" style="padding-top: 12px;">
               <h4 data-i18n="dir_title">Target Directory</h4>
               <button id="connect-dir-sidebar-btn" class="btn btn-secondary btn-xs" data-i18n="btn_connect_dir">Connect</button>
             </div>

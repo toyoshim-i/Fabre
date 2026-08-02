@@ -206,7 +206,7 @@ export function renderRecentFilesUI(recentFiles) {
   if (!listEl) return;
 
   if (!recentFiles || recentFiles.length === 0) {
-    listEl.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); padding: 8px 0;">${t('no_recent_files')}</p>`;
+    listEl.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); padding: 8px 0;">${t('no_recent_projects')}</p>`;
     return;
   }
 

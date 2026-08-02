@@ -34,7 +34,9 @@ export const DICTIONARY = {
 
   // Sidebar Tabs
   tab_runner: { en: 'Runner', ja: '実行制御' },
-  tab_files: { en: 'Files', ja: 'ファイル' },
+  tab_files: { en: 'Files & Projects', ja: 'ファイル / プロジェクト' },
+  recent_projects_title: { en: 'Recent Projects', ja: '最近のプロジェクト' },
+  no_recent_projects: { en: 'No recent projects found.', ja: '最近開いたプロジェクトはありません。' },
   tab_memory: { en: 'Memory', ja: '変数メモリ' },
   tab_logs: { en: 'Logs', ja: 'ログ・履歴' },
   tab_config: { en: 'Config', ja: '設定' },

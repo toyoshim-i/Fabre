@@ -531,19 +531,26 @@ import { callMcpTool } from './mcp.js';
  * Execute a local or connected MCP tool (testing, file system, sandbox, or remote MCP server)
  */
 export async function executeLocalTool(toolType, inputVal) {
-  if (toolType && toolType.startsWith('mcp:')) {
-    const matchedMcp = (state.mcpTools || []).find(t => t.fullId === toolType);
-    if (!matchedMcp) {
-      const mcpByName = (state.mcpTools || []).find(t => t.name === toolType.replace(/^mcp:/, ''));
-      if (mcpByName) {
-        return await callMcpTool(mcpByName.serverUrl, mcpByName.name, inputVal);
+  let cleanType = toolType;
+  if (cleanType && cleanType.startsWith('mcp:')) {
+    const rawName = cleanType.replace(/^mcp:/, '');
+    const builtInTypes = ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search', 'run_tests'];
+    if (builtInTypes.includes(rawName) || builtInTypes.includes(rawName.split(':')[1])) {
+      cleanType = rawName.includes(':') ? rawName.split(':')[1] : rawName;
+    } else {
+      const matchedMcp = (state.mcpTools || []).find(t => t.fullId === toolType);
+      if (!matchedMcp) {
+        const mcpByName = (state.mcpTools || []).find(t => t.name === rawName);
+        if (mcpByName) {
+          return await callMcpTool(mcpByName.serverUrl, mcpByName.name, inputVal);
+        }
+        return `Error: MCP Tool '${toolType}' is not currently connected.`;
       }
-      return `Error: MCP Tool '${toolType}' is not currently connected.`;
+      return await callMcpTool(matchedMcp.serverUrl, matchedMcp.name, inputVal);
     }
-    return await callMcpTool(matchedMcp.serverUrl, matchedMcp.name, inputVal);
   }
 
-  if (toolType === 'mock_test' || toolType === 'run_tests') {
+  if (cleanType === 'mock_test' || cleanType === 'run_tests') {
     if (state.variables['current_code']) {
       const code = String(state.variables['current_code']);
       if (code.includes('SyntaxError') || code.includes('BUG') || code.includes('FAIL')) {
@@ -553,27 +560,46 @@ export async function executeLocalTool(toolType, inputVal) {
     return 'TEST PASS: All unit tests passed (0 errors).';
   }
 
-  if (toolType === 'list_files') {
+  if (cleanType === 'list_files') {
     if (state.filesList && state.filesList.length > 0) {
       return state.filesList.map(f => f.path).join('\n');
     }
     return 'No files found in connected directory.';
   }
 
-  if (toolType === 'read_file') {
-    const targetFile = state.filesList.find(f => f.path === inputVal || f.name === inputVal);
+  if (cleanType === 'read_file') {
+    let filePath = inputVal;
+    if (typeof inputVal === 'string' && inputVal.trim().startsWith('{')) {
+      try { filePath = JSON.parse(inputVal).filePath || inputVal; } catch (e) {}
+    } else if (typeof inputVal === 'object' && inputVal.filePath) {
+      filePath = inputVal.filePath;
+    }
+    const targetFile = state.filesList.find(f => f.path === filePath || f.name === filePath);
     if (targetFile && targetFile.handle) {
       const file = await targetFile.handle.getFile();
       return await file.text();
     }
-    return `Error: File '${inputVal}' not found in connected directory.`;
+    return `Error: File '${filePath}' not found in connected directory.`;
   }
 
-  if (toolType === 'write_file') {
-    const parts = inputVal.split('::');
-    const path = parts[0]?.trim();
-    const content = parts[1]?.trim() || '';
-    if (!path) return 'Error: Invalid write_file format. Expected "path::content"';
+  if (cleanType === 'write_file') {
+    let path = '', content = '';
+    if (typeof inputVal === 'string' && inputVal.trim().startsWith('{')) {
+      try {
+        const json = JSON.parse(inputVal);
+        path = json.filePath || json.path || '';
+        content = json.content || '';
+      } catch (e) {}
+    } else if (typeof inputVal === 'object') {
+      path = inputVal.filePath || inputVal.path || '';
+      content = inputVal.content || '';
+    }
+    if (!path && typeof inputVal === 'string') {
+      const parts = inputVal.split('::');
+      path = parts[0]?.trim();
+      content = parts[1]?.trim() || '';
+    }
+    if (!path) return 'Error: Invalid write_file format. Expected "path::content" or JSON {"filePath","content"}';
     
     if (state.directoryHandle) {
       try {
@@ -589,19 +615,29 @@ export async function executeLocalTool(toolType, inputVal) {
     return `Mock write success for ${path}`;
   }
 
-  if (toolType === 'mock_search') {
+  if (cleanType === 'mock_search') {
     return `Mock Search Results for "${inputVal}": Found 3 relevant articles.`;
   }
 
-  if (toolType === 'js_sandbox') {
+  if (cleanType === 'js_sandbox') {
+    let jsCode = inputVal;
+    if (typeof inputVal === 'string' && inputVal.trim().startsWith('{')) {
+      try {
+        const json = JSON.parse(inputVal);
+        jsCode = json.code || json.input || inputVal;
+      } catch (e) {}
+    } else if (typeof inputVal === 'object') {
+      jsCode = inputVal.code || inputVal.input || JSON.stringify(inputVal);
+    }
+
     try {
       let result;
       try {
-        const fn = new Function('input', 'variables', `return (${inputVal});`);
-        result = fn(inputVal, state.variables);
+        const fn = new Function('input', 'variables', `return (${jsCode});`);
+        result = fn(jsCode, state.variables);
       } catch (exprErr) {
-        const fn = new Function('input', 'variables', inputVal);
-        result = fn(inputVal, state.variables);
+        const fn = new Function('input', 'variables', jsCode);
+        result = fn(jsCode, state.variables);
       }
       return result !== undefined ? String(result) : 'JS executed successfully (no return value)';
     } catch (e) {
@@ -609,5 +645,5 @@ export async function executeLocalTool(toolType, inputVal) {
     }
   }
 
-  return `Executed tool ${toolType} with input: ${inputVal}`;
+  return `Executed tool ${cleanType} with input: ${typeof inputVal === 'object' ? JSON.stringify(inputVal) : inputVal}`;
 }
