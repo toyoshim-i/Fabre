@@ -43,7 +43,11 @@ export async function stepWorkflow() {
   }
 
   setRunnerState('running');
-  addLog(t('executing_node', { title: currentNode.title, type: currentNode.type }), 'info');
+  addLog(
+    t('executing_node', { title: currentNode.title, type: currentNode.type }),
+    'info',
+    `[Target Node]\nID: ${currentNode.id}\nTitle: ${currentNode.title}\nType: ${currentNode.type}\n\n[Node Data Configuration]\n${JSON.stringify(currentNode.data || {}, null, 2)}`
+  );
 
   try {
     // Evaluate Node
@@ -272,6 +276,11 @@ async function evaluateNode(node) {
         return '';
       });
       node.data.lastCompiledPrompt = outputValue;
+      addLog(
+        state.lang === 'en' ? `Prompt Builder [${node.title}] compiled template` : `プロンプト作成 [${node.title}] のテンプレート生成完了`,
+        'info',
+        `[Raw Template]\n${tmpl}\n\n[Port Data Input]\n${portInput !== null && portInput !== undefined ? portInput : '(none)'}\n\n[Compiled Output Prompt]\n${outputValue}`
+      );
       break;
     }
 
@@ -314,11 +323,16 @@ async function evaluateNode(node) {
           const reactMatch = parseReActToolCall(outputValue);
           if (reactMatch) {
             node.data.lastToolCall = reactMatch.input;
-            addLog(t('llm_tool_call_emitted', { tool: reactMatch.tool }), 'info');
+            addLog(t('llm_tool_call_emitted', { tool: reactMatch.tool }), 'info', `[ReAct Tool Call Detected]\nTool: ${reactMatch.tool}\nPayload: ${reactMatch.input}`);
             if (!outputValue) outputValue = reactMatch.input;
           }
         }
         node.data.lastResponse = outputValue;
+        addLog(
+          state.lang === 'en' ? `LLM Call [${node.title}] output generated` : `LLM呼び出し [${node.title}] の出力完了`,
+          'success',
+          `[Input User Prompt]\n${promptInput}\n\n[System Prompt]\n${systemPrompt}\n\n[Temperature] ${temp}\n[Tools Connected] ${isToolPortConnected}\n\n[LLM Output Response]\n${outputValue}${node.data.lastToolCall ? `\n\n[Tool Call Payload]\n${node.data.lastToolCall}` : ''}`
+        );
         nextFlowPort = 'flow-success';
       } catch (err) {
         addLog(`[Error in LLM Call ${node.title}]: ${err.message}`, 'error', err.stack);
@@ -394,7 +408,11 @@ async function evaluateNode(node) {
 
       nextFlowPort = isTrue ? 'flow-true' : 'flow-false';
       outputValue = isTrue ? 'TRUE' : 'FALSE';
-      addLog(t('cond_evaluated', { result: isTrue, branch: nextFlowPort }), 'info');
+      addLog(
+        t('cond_evaluated', { result: isTrue, branch: nextFlowPort }),
+        'info',
+        `[Condition Rule]\nType: ${condType}\nPattern/Value: ${condVal}\n\n[Tested Text Input]\n${textIn}\n\n[Evaluation Result]\n${isTrue ? 'TRUE -> Branch flow-true' : 'FALSE -> Branch flow-false'}`
+      );
       break;
     }
 
@@ -412,7 +430,11 @@ async function evaluateNode(node) {
       
       setVariable(varName, newValue);
       outputValue = newValue;
-      addLog(t('set_var_log', { name: varName, val: newValue }), 'success');
+      addLog(
+        t('set_var_log', { name: varName, val: typeof newValue === 'object' ? JSON.stringify(newValue) : String(newValue).substring(0, 80) }),
+        'success',
+        `[Target Variable]\nName: ${varName}\nMode: ${isAppend ? 'Append' : 'Overwrite'}\n\n[Updated Variable Content]\n${typeof newValue === 'object' ? JSON.stringify(newValue, null, 2) : newValue}`
+      );
       break;
     }
 
@@ -421,6 +443,11 @@ async function evaluateNode(node) {
       const toolType = node.data.toolType || 'mock_test';
       outputValue = await executeLocalTool(toolType, inputIn);
       node.data.lastToolResult = outputValue;
+      addLog(
+        state.lang === 'en' ? `Tool Exec [${node.title}] executed (${toolType})` : `ツール実行 [${node.title}] 完了 (${toolType})`,
+        'info',
+        `[Tool Executed]\nType: ${toolType}\n\n[Tool Input / Code Payload]\n${inputIn}\n\n[Execution Output Result]\n${outputValue}`
+      );
       break;
     }
 
