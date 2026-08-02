@@ -24,6 +24,7 @@ import {
   addLog,
   clearLogs,
   initRecentFiles,
+  setExecutionDelay,
   NODE_TYPES
 } from '../src/state.js';
 import { 
@@ -471,7 +472,7 @@ test('Model state mutations & events regression tests', async (t) => {
     clearCanvasState();
     resetWorkflow();
 
-    const evtNode = { id: 'evt1', type: NODE_TYPES.EVENT_WAIT, title: 'User Input Event', data: {} };
+    const evtNode = { id: 'evt1', type: NODE_TYPES.EVENT_WAIT, title: 'User Instruction Event', data: {} };
     const outNode = { id: 'out1', type: NODE_TYPES.OUTPUT, title: 'Output', data: {} };
     addNode(evtNode);
     addNode(outNode);
@@ -488,6 +489,46 @@ test('Model state mutations & events regression tests', async (t) => {
     // Triggering event sets payload and advances
     await triggerNodeEvent('evt1', 'My Custom Event Input');
     assert.strictEqual(evtNode.data.lastEventValue, 'My Custom Event Input');
+  });
+
+  await t.test('should pause after exactly 1 step when stepWorkflow(true) is invoked', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    addNode({ id: 'n1', type: NODE_TYPES.START, title: 'Start', data: { inputValue: 'Hello' } });
+    addNode({ id: 'n2', type: NODE_TYPES.PROMPT, title: 'Prompt', data: { promptTemplate: '{{inputValue}}' } });
+    addNode({ id: 'n3', type: NODE_TYPES.OUTPUT, title: 'Output', data: {} });
+
+    addLink({ id: 'l1', fromNode: 'n1', fromPort: 'flow-out', toNode: 'n2', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l2', fromNode: 'n2', fromPort: 'flow-out', toNode: 'n3', toPort: 'flow-in', type: 'flow' });
+
+    // Step 1: stepWorkflow(true) executes n1 and pauses at n2
+    await stepWorkflow(true);
+    assert.strictEqual(state.currentNodeId, 'n2');
+    assert.strictEqual(state.runnerState, 'paused');
+    assert.strictEqual(state.totalSteps, 1);
+  });
+
+  await t.test('should execute multi-node workflow continuously to completion when runWorkflow() is invoked', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    addNode({ id: 'n1', type: NODE_TYPES.START, title: 'Start', data: { inputValue: 'Auto Run Test' } });
+    addNode({ id: 'n2', type: NODE_TYPES.PROMPT, title: 'Prompt', data: { promptTemplate: 'Echo: {{inputValue}}' } });
+    addNode({ id: 'n3', type: NODE_TYPES.OUTPUT, title: 'Output', data: {} });
+
+    addLink({ id: 'l1', fromNode: 'n1', fromPort: 'flow-out', toNode: 'n2', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l2', fromNode: 'n2', fromPort: 'flow-out', toNode: 'n3', toPort: 'flow-in', type: 'flow' });
+
+    setExecutionDelay(10);
+    const { runWorkflow: runExec } = await import('../src/runtime.js');
+
+    runExec();
+    // Wait for continuous execution loop to complete all 3 steps
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    assert.strictEqual(state.runnerState, 'success');
+    assert.strictEqual(state.totalSteps, 3);
   });
 
 });
