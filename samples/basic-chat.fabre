@@ -2,11 +2,11 @@
   "format": "fabre-workflow",
   "version": "0.1.0",
   "meta": {
-    "title": "Simple Chat with Memory",
-    "description": "Combines prompt interpolation and variable storage to preserve chat responses in memory.",
+    "title": "Simple Query & Variable Memory",
+    "description": "Combines prompt template interpolation and variable storage to save LLM responses in memory.",
     "author": "Fabre Team",
     "createdAt": "2026-07-31T12:00:00.000Z",
-    "updatedAt": "2026-07-31T12:00:00.000Z"
+    "updatedAt": "2026-08-02T12:00:00.000Z"
   },
   "nodes": [
     {
@@ -55,7 +55,7 @@
       "width": 250,
       "height": 170,
       "data": {
-        "variableName": "chat_history"
+        "variableName": "last_response"
       }
     },
     {
@@ -80,6 +80,6 @@
     { "id": "link_d4", "fromNode": "node_setvar_1", "fromPort": "value-out", "toNode": "node_output_1", "toPort": "text-in", "type": "data" }
   ],
   "variables": {
-    "chat_history": ""
+    "last_response": ""
   }
 }
