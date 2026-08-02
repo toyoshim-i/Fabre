@@ -339,7 +339,14 @@ export function getAllAvailableToolsForOpenAi() {
 export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null, options = {}) {
   let responseContent = '';
   let toolCalls = null;
-  const canonicalMessages = normalizeToCanonicalMessages(userPrompt, systemPrompt);
+  
+  let canonicalMessages = Array.isArray(options.messagesPayload) && options.messagesPayload.length > 0
+    ? options.messagesPayload.map(m => ({ role: m.role || 'user', content: m.content || '' }))
+    : normalizeToCanonicalMessages(userPrompt, systemPrompt);
+
+  if (systemPrompt && !canonicalMessages.some(m => m.role === 'system')) {
+    canonicalMessages.unshift({ role: 'system', content: systemPrompt });
+  }
 
   if (state.llmProvider === 'chrome-ai') {
     const aiModel = getChromeAiInterface();
@@ -383,11 +390,12 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     }
   } else {
     // External OpenAI-compatible API call
-    if (!state.apiEndpoint) {
-      throw new Error(state.lang === 'en' ? 'API Endpoint URL is not configured in settings.' : 'APIエンドポイントURLが設定されていません。');
+    let rawEndpoint = (options.endpointOverride || state.apiEndpoint || '').trim();
+    if (!rawEndpoint) {
+      throw new Error(state.lang === 'en' ? 'API Endpoint URL is not configured in settings or session override.' : 'APIエンドポイントURLが設定されていません。');
     }
     
-    let endpoint = state.apiEndpoint.trim();
+    let endpoint = rawEndpoint;
     if (endpoint.endsWith('/')) {
       endpoint = endpoint.slice(0, -1);
     }
@@ -396,15 +404,12 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     }
     
     const headers = { 'Content-Type': 'application/json' };
-    if (state.apiKey) {
-      headers['Authorization'] = `Bearer ${state.apiKey}`;
+    const effectiveApiKey = options.apiKeyOverride || state.apiKey;
+    if (effectiveApiKey) {
+      headers['Authorization'] = `Bearer ${effectiveApiKey}`;
     }
     
-    // Resolve model name:
-    // 1. User specified model in settings
-    // 2. First model from our loaded datalist
-    // 3. Fallback default 'qwen2.5-coder:7b'
-    let selectedModel = state.apiModel ? state.apiModel.trim() : '';
+    let selectedModel = (options.modelOverride || state.apiModel || '').trim();
     if (!selectedModel) {
       const datalist = document.getElementById ? document.getElementById('settings-model-datalist') : null;
       if (datalist && datalist.options && datalist.options.length > 0) {

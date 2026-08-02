@@ -239,6 +239,23 @@ function getSourceNodeOutputValue(sourceNode, portId) {
   if (sourceNode.type === NODE_TYPES.CONDITION) {
     return getPortInputValue(sourceNode.id, 'text-in') || '';
   }
+  if (sourceNode.type === NODE_TYPES.SESSION) {
+    if (portId === 'session-out') {
+      return {
+        nodeId: sourceNode.id,
+        messages: sourceNode.data.messages || [],
+        systemPrompt: sourceNode.data.systemPrompt || '',
+        modelOverride: sourceNode.data.modelOverride || '',
+        endpointOverride: sourceNode.data.endpointOverride || '',
+        apiKeyOverride: sourceNode.data.apiKeyOverride || '',
+        maxHistoryTurns: sourceNode.data.maxHistoryTurns || 10
+      };
+    }
+    if (portId === 'messages-out') {
+      return sourceNode.data.messages || [];
+    }
+    return sourceNode.data.messages || [];
+  }
   if (sourceNode.type === NODE_TYPES.STREAM_VIEW) {
     return getPortInputValue(sourceNode.id, 'text-in') || '';
   }
@@ -248,7 +265,7 @@ function getSourceNodeOutputValue(sourceNode, portId) {
 /**
  * Evaluate specific node execution
  */
-async function evaluateNode(node) {
+export async function evaluateNode(node) {
   let nextFlowPort = 'flow-out';
   let outputValue = '';
 
@@ -284,10 +301,94 @@ async function evaluateNode(node) {
       break;
     }
 
+    case NODE_TYPES.SESSION: {
+      if (!Array.isArray(node.data.messages)) {
+        node.data.messages = [];
+      }
+      
+      const userIn = getPortInputValue(node.id, 'user-in');
+      const responseIn = getPortInputValue(node.id, 'response-in');
+
+      // 1. If user input text received, push to messages array
+      if (userIn && typeof userIn === 'string' && userIn.trim()) {
+        const lastMsg = node.data.messages[node.data.messages.length - 1];
+        if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== userIn.trim()) {
+          node.data.messages.push({
+            role: 'user',
+            content: userIn.trim(),
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+
+      // 2. If response text received, push to messages array
+      if (responseIn && typeof responseIn === 'string' && responseIn.trim()) {
+        const lastMsg = node.data.messages[node.data.messages.length - 1];
+        if (!lastMsg || lastMsg.role !== 'assistant' || lastMsg.content !== responseIn.trim()) {
+          node.data.messages.push({
+            role: 'assistant',
+            content: responseIn.trim(),
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+
+      // 3. Sliding window turns trimming
+      const maxTurns = node.data.maxHistoryTurns || 10;
+      const maxMessages = maxTurns * 2;
+      if (node.data.messages.length > maxMessages) {
+        node.data.messages = node.data.messages.slice(-maxMessages);
+      }
+
+      outputValue = node.data.messages;
+      addLog(
+        state.lang === 'en' ? `Session Manager [${node.title}] updated memory` : `対話セッション [${node.title}] メモリ更新完了`,
+        'info',
+        `[Session Node]\nID: ${node.id}\nTitle: ${node.title}\nTotal Messages: ${node.data.messages.length}\nMax History Turns: ${maxTurns}\n\n[Model Override]\n${node.data.modelOverride || '(None - Using Global Default)'}\n\n[Endpoint Override]\n${node.data.endpointOverride || '(None - Using Global Default)'}\n\n[Structured Canonical Messages Payload]\n${JSON.stringify(node.data.messages, null, 2)}`
+      );
+      break;
+    }
+
     case NODE_TYPES.LLM: {
       const promptInput = getPortInputValue(node.id, 'prompt-in') || node.data.lastCompiledPrompt || '';
-      const systemPrompt = node.data.systemPrompt || 'You are a helpful software engineer assistant.';
+      let systemPrompt = node.data.systemPrompt || 'You are a helpful software engineer assistant.';
       const temp = node.data.temperature !== undefined ? node.data.temperature : 0.7;
+
+      // Check if session-in is connected
+      const sessionContext = getPortInputValue(node.id, 'session-in');
+      let canonicalMessagesPayload = null;
+      let effectiveModel = null;
+      let effectiveEndpoint = null;
+      let effectiveApiKey = null;
+      let targetSessionNode = null;
+
+      if (sessionContext && typeof sessionContext === 'object') {
+        const sessionNodeId = sessionContext.nodeId;
+        targetSessionNode = state.nodes.find(n => n.id === sessionNodeId);
+        
+        if (sessionContext.systemPrompt) {
+          systemPrompt = sessionContext.systemPrompt;
+        }
+        if (sessionContext.modelOverride) {
+          effectiveModel = sessionContext.modelOverride;
+        }
+        if (sessionContext.endpointOverride) {
+          effectiveEndpoint = sessionContext.endpointOverride;
+        }
+        if (sessionContext.apiKeyOverride) {
+          effectiveApiKey = sessionContext.apiKeyOverride;
+        }
+
+        // Build canonical messages array
+        let baseMessages = Array.isArray(sessionContext.messages) ? [...sessionContext.messages] : [];
+        if (promptInput && promptInput.trim()) {
+          const lastMsg = baseMessages[baseMessages.length - 1];
+          if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== promptInput.trim()) {
+            baseMessages.push({ role: 'user', content: promptInput.trim() });
+          }
+        }
+        canonicalMessagesPayload = baseMessages;
+      }
 
       // Automatically enable tools if tool-call-out port is connected to downstream node(s)
       const isToolPortConnected = state.links.some(l => l.fromNode === node.id && l.fromPort === 'tool-call-out');
@@ -295,7 +396,11 @@ async function evaluateNode(node) {
       const llmOptions = {
         enableTools: isToolPortConnected,
         tools: node.data.tools || null,
-        returnStructured: true
+        returnStructured: true,
+        modelOverride: effectiveModel,
+        endpointOverride: effectiveEndpoint,
+        apiKeyOverride: effectiveApiKey,
+        messagesPayload: canonicalMessagesPayload
       };
 
       try {
@@ -328,10 +433,26 @@ async function evaluateNode(node) {
           }
         }
         node.data.lastResponse = outputValue;
+
+        // Auto-push LLM response into connected Session Manager memory if available
+        if (targetSessionNode && outputValue) {
+          if (!Array.isArray(targetSessionNode.data.messages)) {
+            targetSessionNode.data.messages = [];
+          }
+          const lastMsg = targetSessionNode.data.messages[targetSessionNode.data.messages.length - 1];
+          if (!lastMsg || lastMsg.role !== 'assistant' || lastMsg.content !== outputValue) {
+            targetSessionNode.data.messages.push({
+              role: 'assistant',
+              content: outputValue,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+
         addLog(
           state.lang === 'en' ? `LLM Call [${node.title}] output generated` : `LLM呼び出し [${node.title}] の出力完了`,
           'success',
-          `[Input User Prompt]\n${promptInput}\n\n[System Prompt]\n${systemPrompt}\n\n[Temperature] ${temp}\n[Tools Connected] ${isToolPortConnected}\n\n[LLM Output Response]\n${outputValue}${node.data.lastToolCall ? `\n\n[Tool Call Payload]\n${node.data.lastToolCall}` : ''}`
+          `[Input User Prompt]\n${promptInput}\n\n[System Prompt]\n${systemPrompt}\n\n[Effective Model]\n${effectiveModel || state.apiModel || '(Global Default)'}\n\n[Effective Endpoint]\n${effectiveEndpoint || state.apiEndpoint || '(Global Default)'}\n\n[LLM Output Response]\n${outputValue}${node.data.lastToolCall ? `\n\n[Tool Call Payload]\n${node.data.lastToolCall}` : ''}`
         );
         nextFlowPort = 'flow-success';
       } catch (err) {
@@ -419,13 +540,11 @@ async function evaluateNode(node) {
     case NODE_TYPES.SET_VAR: {
       const valIn = getPortInputValue(node.id, 'value-in') || '';
       const varName = node.data.variableName || 'temp_var';
-      const isAppend = node.data.mode === 'append' || varName.toLowerCase().includes('history');
+      const isAppend = node.data.mode === 'append';
       
       let newValue = valIn;
-      if (isAppend) {
-        const lastInput = state.nodes.find(n => n.type === NODE_TYPES.EVENT_WAIT)?.data.lastEventValue || '';
-        const turnStr = valIn.startsWith('User:') ? valIn : `User: ${lastInput}\nAssistant: ${valIn}\n\n`;
-        newValue = (state.variables[varName] ? state.variables[varName] : '') + turnStr;
+      if (isAppend && state.variables[varName]) {
+        newValue = state.variables[varName] + '\n' + valIn;
       }
       
       setVariable(varName, newValue);
@@ -465,10 +584,18 @@ async function evaluateNode(node) {
     }
 
     case NODE_TYPES.STREAM_VIEW: {
+      const messagesIn = getPortInputValue(node.id, 'messages-in');
       const textIn = getPortInputValue(node.id, 'text-in') || '';
       let roleIn = getPortInputValue(node.id, 'role-in');
-      
-      if (textIn) {
+
+      if (Array.isArray(messagesIn) && messagesIn.length > 0) {
+        // Clear chat UI and populate from structured canonical messages array!
+        clearChatMessages();
+        for (const msg of messagesIn) {
+          addChatMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+        }
+        outputValue = messagesIn[messagesIn.length - 1]?.content || '';
+      } else if (textIn) {
         let displayText = textIn;
         let displayRole = roleIn;
 

@@ -694,6 +694,25 @@ export function showNodeProperties(nodeId) {
         <input type="range" id="prop-llm-temp" min="0.0" max="1.0" step="0.1" value="${node.data.temperature !== undefined ? node.data.temperature : 0.7}">
       </div>
     `;
+  } else if (node.type === NODE_TYPES.SESSION) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_session_system || (state.lang === 'en' ? 'System Instruction' : 'システム指示')}</label>
+        <textarea id="prop-session-system" class="node-input-text node-textarea" placeholder="You are a helpful assistant...">${node.data.systemPrompt || ''}</textarea>
+      </div>
+      <div class="form-group">
+        <label>${t.prop_session_model || (state.lang === 'en' ? 'Model Override (Optional)' : 'モデル名の上書き（任意）')}</label>
+        <input type="text" id="prop-session-model" class="node-input-text" value="${node.data.modelOverride || ''}" placeholder="e.g. gpt-4o, qwen2.5-coder:7b">
+      </div>
+      <div class="form-group">
+        <label>${t.prop_session_endpoint || (state.lang === 'en' ? 'Endpoint URL Override (Optional)' : 'APIエンドポイントの上書き（任意）')}</label>
+        <input type="text" id="prop-session-endpoint" class="node-input-text" value="${node.data.endpointOverride || ''}" placeholder="e.g. http://localhost:11434/v1">
+      </div>
+      <div class="form-group">
+        <label>${t.prop_session_max_turns || (state.lang === 'en' ? 'Max History Turns' : '最大保持ターン数')}</label>
+        <input type="number" id="prop-session-max-turns" class="node-input-text" min="1" max="100" value="${node.data.maxHistoryTurns || 10}">
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
     html += `
       <div class="form-group">
@@ -803,6 +822,36 @@ function wirePropertyControls(node) {
       const val = parseFloat(e.target.value);
       updateNodeData(node.id, 'temperature', val);
       tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${val})`;
+    });
+  }
+
+  // Session Manager inputs
+  const sessionSystem = document.getElementById('prop-session-system');
+  if (sessionSystem) {
+    sessionSystem.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'systemPrompt', e.target.value);
+    });
+  }
+
+  const sessionModel = document.getElementById('prop-session-model');
+  if (sessionModel) {
+    sessionModel.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'modelOverride', e.target.value);
+    });
+  }
+
+  const sessionEndpoint = document.getElementById('prop-session-endpoint');
+  if (sessionEndpoint) {
+    sessionEndpoint.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'endpointOverride', e.target.value);
+    });
+  }
+
+  const sessionMaxTurns = document.getElementById('prop-session-max-turns');
+  if (sessionMaxTurns) {
+    sessionMaxTurns.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) || 10;
+      updateNodeData(node.id, 'maxHistoryTurns', val);
     });
   }
 

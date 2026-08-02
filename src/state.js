@@ -496,6 +496,7 @@ export const NODE_TYPES = {
   EVENT_WAIT: 'event_wait',
   PROMPT: 'prompt',
   LLM: 'llm',
+  SESSION: 'session',
   EXTRACTOR: 'extractor',
   CONDITION: 'condition',
   SET_VAR: 'set_var',
@@ -509,6 +510,7 @@ export const NODE_COLORS = {
   event_wait: '#06b6d4',
   prompt: 'var(--color-prompt)',
   llm: 'var(--color-llm)',
+  session: '#10b981',
   extractor: 'var(--color-extractor)',
   condition: 'var(--color-condition)',
   set_var: 'var(--color-setvar)',
@@ -522,6 +524,7 @@ export const NODE_ICONS = {
   event_wait: '⚡',
   prompt: '✎',
   llm: '🤖',
+  session: '🧠',
   extractor: '⚲',
   condition: '⇅',
   set_var: '⛃',
@@ -557,10 +560,23 @@ export const PORT_TEMPLATES = {
       { id: 'prompt-out', name: 'Prompt', type: 'data' }
     ]
   },
+  session: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' },
+      { id: 'user-in', name: 'User Text', type: 'data' },
+      { id: 'response-in', name: 'Reply Text', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'session-out', name: 'Session', type: 'data' },
+      { id: 'messages-out', name: 'Messages', type: 'data' }
+    ]
+  },
   llm: {
     inputs: [
       { id: 'flow-in', name: 'Exec', type: 'flow' },
-      { id: 'prompt-in', name: 'Prompt', type: 'data' }
+      { id: 'prompt-in', name: 'Prompt', type: 'data' },
+      { id: 'session-in', name: 'Session', type: 'data' }
     ],
     outputs: [
       { id: 'flow-success', name: 'Success', type: 'flow' },
@@ -614,7 +630,8 @@ export const PORT_TEMPLATES = {
     inputs: [
       { id: 'flow-in', name: 'Exec', type: 'flow' },
       { id: 'text-in', name: 'Text', type: 'data' },
-      { id: 'role-in', name: 'Role', type: 'data' }
+      { id: 'role-in', name: 'Role', type: 'data' },
+      { id: 'messages-in', name: 'Messages', type: 'data' }
     ],
     outputs: [
       { id: 'flow-out', name: 'Next', type: 'flow' },

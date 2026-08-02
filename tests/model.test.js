@@ -392,4 +392,29 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(inputVal, 'alert("HELLO")');
   });
 
+  await t.test('should manage structured session messages and handle LLM session inheritance', async () => {
+    clearCanvasState();
+    resetRunner();
+    
+    // Add Event Wait, Session Manager, and LLM Call
+    addNode({ id: 'evt1', type: NODE_TYPES.EVENT_WAIT, title: 'Event Wait', data: { lastEventValue: 'Hello AI!' } });
+    addNode({ id: 'sess1', type: NODE_TYPES.SESSION, title: 'Session Manager', data: { modelOverride: 'gpt-4o-test', maxHistoryTurns: 5, messages: [] } });
+    addNode({ id: 'llm1', type: NODE_TYPES.LLM, title: 'LLM Call', data: {} });
+    
+    addLink({ id: 'l1', fromNode: 'evt1', fromPort: 'data-out', toNode: 'sess1', toPort: 'user-in', type: 'data' });
+    addLink({ id: 'l2', fromNode: 'sess1', fromPort: 'session-out', toNode: 'llm1', toPort: 'session-in', type: 'data' });
+    
+    const { getPortInputValue, evaluateNode } = await import('../src/runtime.js');
+    
+    // Evaluate Session Node
+    await evaluateNode(state.nodes.find(n => n.id === 'sess1'));
+    
+    const sessionVal = getPortInputValue('llm1', 'session-in');
+    assert.ok(sessionVal);
+    assert.strictEqual(sessionVal.modelOverride, 'gpt-4o-test');
+    assert.strictEqual(sessionVal.messages.length, 1);
+    assert.strictEqual(sessionVal.messages[0].role, 'user');
+    assert.strictEqual(sessionVal.messages[0].content, 'Hello AI!');
+  });
+
 });

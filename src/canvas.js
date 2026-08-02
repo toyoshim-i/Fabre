@@ -671,10 +671,15 @@ export function createNode(type, x, y) {
     height: type === NODE_TYPES.START ? 140 : 170,
     data: {
       promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
-      systemPrompt: type === NODE_TYPES.LLM 
-        ? 'You are a professional software engineer.' 
+      systemPrompt: type === NODE_TYPES.LLM || type === NODE_TYPES.SESSION
+        ? 'You are a professional software engineer assistant.' 
         : (type === NODE_TYPES.PROMPT ? getDefaultSystemPrompt() : ''),
       temperature: 0.7,
+      modelOverride: '',
+      endpointOverride: '',
+      apiKeyOverride: '',
+      maxHistoryTurns: 10,
+      messages: [],
       conditionType: 'contains',
       conditionValue: 'PASS',
       variableName: type === NODE_TYPES.SET_VAR ? 'current_code' : '',

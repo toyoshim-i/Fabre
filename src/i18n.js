@@ -22,6 +22,7 @@ export const DICTIONARY = {
   node_event_wait: { en: 'Event Wait', ja: 'イベント待機・受領' },
   node_prompt: { en: 'Prompt Builder', ja: 'プロンプト作成' },
   node_llm: { en: 'LLM Call', ja: 'LLM実行' },
+  node_session: { en: 'Session Manager', ja: '対話セッション管理' },
   node_extractor: { en: 'Extractor', ja: '情報抽出' },
   node_condition: { en: 'Condition', ja: '条件分岐' },
   node_set_var: { en: 'Set Var', ja: '変数代入' },
@@ -164,6 +165,10 @@ export const DICTIONARY = {
   config_apikey_placeholder: { en: 'Enter API Key if needed', ja: 'APIキーを入力（必要な場合のみ）' },
   config_model_placeholder: { en: 'qwen2.5-coder:7b', ja: 'qwen2.5-coder:7b' },
   config_url_placeholder: { en: 'http://localhost:11434/v1', ja: 'http://localhost:11434/v1' },
+  prop_session_system: { en: 'System Instruction', ja: 'システム指示' },
+  prop_session_model: { en: 'Model Override (Optional)', ja: 'モデル名の上書き（任意）' },
+  prop_session_endpoint: { en: 'Endpoint URL Override (Optional)', ja: 'APIエンドポイントの上書き（任意）' },
+  prop_session_max_turns: { en: 'Max History Turns', ja: '最大保持ターン数' },
 };
 
 /**

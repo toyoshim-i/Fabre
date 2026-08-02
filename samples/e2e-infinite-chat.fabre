@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "meta": {
     "title": "End-to-End Infinite Chat",
-    "description": "Event-driven interactive chat workflow using Event Wait, Prompt Builder, LLM Call, and Stream View nodes.",
+    "description": "Event-driven interactive chat workflow using Event Wait, Session Manager, LLM Call, and Stream View timeline.",
     "author": "Fabre Team",
-    "createdAt": "2026-07-31T13:00:00.000Z",
-    "updatedAt": "2026-07-31T13:00:00.000Z"
+    "createdAt": "2026-08-02T12:00:00.000Z",
+    "updatedAt": "2026-08-02T12:00:00.000Z"
   },
   "nodes": [
     {
@@ -22,47 +22,36 @@
       }
     },
     {
-      "id": "node_prompt_1",
-      "type": "prompt",
-      "title": "Memory Prompt Builder",
+      "id": "node_session_1",
+      "type": "session",
+      "title": "Session Manager",
       "x": 370,
       "y": 160,
-      "width": 310,
-      "height": 170,
+      "width": 300,
+      "height": 200,
       "data": {
-        "promptTemplate": "Conversation History:\n{{chat_history}}\n\nUser Input: {{inputValue}}\nAssistant Reply:"
+        "systemPrompt": "You are Fabre AI, a helpful software engineer assistant.",
+        "maxHistoryTurns": 10,
+        "messages": []
       }
     },
     {
       "id": "node_llm_1",
       "type": "llm",
       "title": "LLM Call",
-      "x": 730,
+      "x": 720,
       "y": 160,
       "width": 280,
       "height": 170,
       "data": {
-        "systemPrompt": "You are Fabre AI, a helpful software engineer assistant.",
         "temperature": 0.7
-      }
-    },
-    {
-      "id": "node_setvar_1",
-      "type": "set_var",
-      "title": "Update Chat Memory",
-      "x": 1060,
-      "y": 160,
-      "width": 250,
-      "height": 170,
-      "data": {
-        "variableName": "chat_history"
       }
     },
     {
       "id": "node_stream_1",
       "type": "stream_view",
       "title": "Conversation Timeline",
-      "x": 1360,
+      "x": 1050,
       "y": 160,
       "width": 280,
       "height": 220,
@@ -70,17 +59,13 @@
     }
   ],
   "links": [
-    { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_prompt_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f2", "fromNode": "node_prompt_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_setvar_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f4", "fromNode": "node_setvar_1", "fromPort": "flow-out", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f5", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_d1", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_prompt_1", "toPort": "data-in", "type": "data" },
-    { "id": "link_d2", "fromNode": "node_prompt_1", "fromPort": "prompt-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
-    { "id": "link_d3", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_setvar_1", "toPort": "value-in", "type": "data" },
-    { "id": "link_d4", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" }
+    { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_session_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f2", "fromNode": "node_session_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f4", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_d1", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_session_1", "toPort": "user-in", "type": "data" },
+    { "id": "link_d2", "fromNode": "node_session_1", "fromPort": "session-out", "toNode": "node_llm_1", "toPort": "session-in", "type": "data" },
+    { "id": "link_d3", "fromNode": "node_session_1", "fromPort": "messages-out", "toNode": "node_stream_1", "toPort": "messages-in", "type": "data" }
   ],
-  "variables": {
-    "chat_history": ""
-  }
+  "variables": {}
 }
