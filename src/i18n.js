@@ -117,7 +117,9 @@ export const DICTIONARY = {
   // Node Properties Panel
   props_title: { en: 'Node Properties', ja: 'ノード詳細設定' },
   props_placeholder: { en: 'Select a node to inspect properties', ja: 'ノードを選択するとプロパティが表示されます' },
-  label_node_title: { en: 'Node Title', ja: 'ノードタイトル' },
+  prop_node_id: { en: 'Node ID', ja: 'ノード ID' },
+  prop_node_type: { en: 'Node Type', ja: 'ノードタイプ' },
+  prop_node_title: { en: 'Node Title', ja: 'ノードタイトル' },
   label_initial_value: { en: 'Initial Value', ja: '初期入力値 (Text / Code)' },
   label_prompt_tmpl: { en: 'Prompt Template', ja: 'プロンプトテンプレート' },
   label_sys_prompt: { en: 'System Prompt', ja: 'システムプロンプト' },

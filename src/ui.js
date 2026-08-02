@@ -6,6 +6,8 @@ import {
   TRANSLATIONS, 
   getDefaultSystemPrompt, 
   NODE_TYPES,
+  NODE_ICONS,
+  NODE_COLORS,
   setLanguage,
   setTheme,
   setLlmProvider,
@@ -630,11 +632,19 @@ export function showNodeProperties(nodeId) {
   let html = `
     <!-- Common Node Fields -->
     <div class="form-group">
-      <label>${t.prop_node_id}</label>
+      <label>${t.prop_node_id || 'Node ID'}</label>
       <input type="text" class="node-input-text" value="${node.id}" readonly style="opacity: 0.6; font-family: var(--font-mono); font-size:10px;">
     </div>
     <div class="form-group">
-      <label>${t.prop_node_title}</label>
+      <label>${t.prop_node_type || (state.lang === 'en' ? 'Node Type' : 'ノードタイプ')}</label>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; font-size: 11px;">
+        <span style="font-size: 14px;">${NODE_ICONS[node.type] || '⚙'}</span>
+        <span style="font-weight: 600; color: ${NODE_COLORS[node.type] || 'var(--primary)'};">${node.type.toUpperCase()}</span>
+        <span style="color: var(--text-muted); font-size: 10px; margin-left: auto;">(${node.type})</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>${t.prop_node_title || 'Node Title'}</label>
       <input type="text" id="prop-title-input" class="node-input-text" value="${node.title}">
     </div>
     <div class="border-top" style="margin-top: 8px; padding-top: 8px;"></div>
