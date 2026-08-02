@@ -336,7 +336,59 @@ export function getAllAvailableToolsForOpenAi() {
  * @param {object} options Options (tools, enableTools, returnStructured)
  * @returns {Promise<string|object>} Content response or structured object from LLM
  */
+function generateSmartMockLlmResponse(systemPrompt, userPrompt, options) {
+  const promptStr = String(userPrompt || '');
+  const sysStr = String(systemPrompt || '');
+  
+  if (options && options.enableTools) {
+    if (promptStr.includes('alert') || sysStr.includes('automation assistant')) {
+      return {
+        type: 'tool_calls',
+        content: '```js\nalert("HELLO");\n```',
+        tool_calls: [
+          {
+            function: {
+              name: 'js_sandbox',
+              arguments: JSON.stringify({ code: 'alert("HELLO");' })
+            }
+          }
+        ]
+      };
+    }
+  }
+
+  if (sysStr.includes('automation assistant') || promptStr.includes('Generate executable JavaScript')) {
+    return "```js\nalert('HELLO');\n```";
+  }
+
+  if (promptStr.includes('PASS') || sysStr.includes('Condition')) {
+    return 'TEST PASS - All checks completed successfully.';
+  }
+
+  if (promptStr.includes('sum(arr)') || sysStr.includes('Senior Engineer')) {
+    return 'Analysis: Code contains potential edge case for empty array. Recommended check added.';
+  }
+
+  return 'WebAssembly (Wasm) is a binary instruction format for a stack-based virtual machine, designed as a portable compilation target for high-performance web applications.';
+}
+
 export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null, options = {}) {
+  if (state.useMockLlm || state.mockLlmHandler) {
+    if (typeof state.mockLlmHandler === 'function') {
+      const mockRes = await state.mockLlmHandler(systemPrompt, userPrompt, options);
+      if (typeof mockRes === 'string') {
+        return options.returnStructured ? { type: 'text', content: mockRes } : mockRes;
+      }
+      return mockRes;
+    }
+    
+    const mockContent = generateSmartMockLlmResponse(systemPrompt, userPrompt, options);
+    if (options.returnStructured && typeof mockContent === 'object') {
+      return mockContent;
+    }
+    return options.returnStructured ? { type: 'text', content: mockContent } : mockContent;
+  }
+
   let responseContent = '';
   let toolCalls = null;
   

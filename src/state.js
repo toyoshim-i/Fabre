@@ -51,6 +51,8 @@ export const state = {
   apiKey: '',
   chromeAiAvailable: false,
   chromeAiCapabilities: null,
+  useMockLlm: false,
+  mockLlmHandler: null,
 
   // Event Emitter Implementation
   on(event, callback) {
@@ -108,6 +110,14 @@ export function setApiModel(model) {
 export function setApiKey(key) {
   state.apiKey = key;
   state.emit('apiKeyChanged', key);
+}
+
+export function setUseMockLlm(enabled) {
+  state.useMockLlm = enabled;
+}
+
+export function setMockLlmHandler(handler) {
+  state.mockLlmHandler = handler;
 }
 
 export function addNode(newNode) {
