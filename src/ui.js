@@ -807,10 +807,16 @@ export function showNodeProperties(nodeId) {
       </div>
     `;
   } else if (node.type === NODE_TYPES.OUTPUT) {
+    const valText = node.data.lastOutputValue || '';
     html += `
       <div class="form-group">
         <label>${t.prop_output_label}</label>
         <input type="text" id="prop-output-input" class="node-input-text" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Verification Report">
+      </div>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>${state.lang === 'en' ? 'Last Output Result' : '最終出力結果'}</label>
+        <textarea readonly class="node-input-text node-textarea" style="font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,0.3);" placeholder="(No output result received yet)">${valText}</textarea>
+        ${valText ? `<button class="btn btn-secondary btn-xs" id="copy-output-btn" style="margin-top: 6px; width: 100%;">${state.lang === 'en' ? '📋 Copy Result to Clipboard' : '📋 結果をクリップボードにコピー'}</button>` : ''}
       </div>
     `;
   }
@@ -941,6 +947,18 @@ function wirePropertyControls(node) {
   if (outputInput) {
     outputInput.addEventListener('input', (e) => {
       updateNodeData(node.id, 'outputLabel', e.target.value);
+    });
+  }
+
+  const copyOutputBtn = document.getElementById('copy-output-btn');
+  if (copyOutputBtn) {
+    copyOutputBtn.addEventListener('click', () => {
+      const val = node.data.lastOutputValue || '';
+      if (val && navigator.clipboard) {
+        navigator.clipboard.writeText(val).then(() => {
+          addLog(state.lang === 'en' ? 'Output result copied to clipboard.' : '出力結果をクリップボードにコピーしました。', 'info');
+        });
+      }
     });
   }
 }

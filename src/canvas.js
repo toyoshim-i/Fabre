@@ -304,7 +304,15 @@ export function renderNode(node) {
       </div>
     `;
   } else if (node.type === NODE_TYPES.OUTPUT) {
-    html += `<div class="node-field-group"><label data-i18n="prop_output_label">Label</label><input type="text" class="node-input-text inline-edit" data-prop="outputLabel" value="${node.data.outputLabel || 'Output'}" placeholder="e.g. Final Result"></div>`;
+    const valDisplay = node.data.lastOutputValue ? escapeHtml(String(node.data.lastOutputValue)) : '<i style="color: var(--text-muted);" data-i18n="output_empty_placeholder">(No output result yet)</i>';
+    html += `
+      <div class="node-field-group">
+        <label data-i18n="node_output_result">Final Output Result</label>
+        <div class="output-result-box" style="max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">
+          ${valDisplay}
+        </div>
+      </div>
+    `;
   }
 
   html += `</div>`; // End of body
@@ -814,5 +822,31 @@ export function updateStreamViewContent(node) {
     });
   }
   box.innerHTML = streamHtml;
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Update Output node result box inner HTML reactively without recreating card element
+ */
+export function updateOutputNodeContent(node) {
+  if (typeof document === 'undefined') return;
+  const card = document.getElementById(node.id);
+  if (!card) return;
+
+  const box = card.querySelector('.output-result-box');
+  if (!box) return;
+
+  box.innerHTML = node.data.lastOutputValue 
+    ? escapeHtml(String(node.data.lastOutputValue)) 
+    : '<i style="color: var(--text-muted);" data-i18n="output_empty_placeholder">(No output result yet)</i>';
   box.scrollTop = box.scrollHeight;
 }

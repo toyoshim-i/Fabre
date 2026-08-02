@@ -637,6 +637,8 @@ export async function evaluateNode(node) {
     case NODE_TYPES.OUTPUT: {
       const resultIn = getPortInputValue(node.id, 'text-in') || '';
       outputValue = resultIn;
+      node.data.lastOutputValue = resultIn;
+      import('./canvas.js').then(m => m.updateOutputNodeContent(node));
       break;
     }
   }
