@@ -320,23 +320,20 @@ export const DEFAULT_RECENT_FILES = [
       },
       nodes: [
         { id: 'node_event_wait_1', type: 'event_wait', title: 'User Input Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'What is WebAssembly?' } },
-        { id: 'node_prompt_1', type: 'prompt', title: 'Memory Prompt Builder', x: 370, y: 160, width: 310, height: 170, data: { promptTemplate: 'Conversation History:\n{{chat_history}}\n\nUser Input: {{inputValue}}\nAssistant Reply:' } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 730, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are Fabre AI, a helpful software engineer assistant.', temperature: 0.7 } },
-        { id: 'node_setvar_1', type: 'set_var', title: 'Update Chat Memory', x: 1060, y: 160, width: 250, height: 170, data: { variableName: 'chat_history' } },
-        { id: 'node_stream_1', type: 'stream_view', title: 'Conversation Timeline', x: 1360, y: 160, width: 280, height: 220, data: {} }
+        { id: 'node_session_1', type: 'session', title: 'Session Manager', x: 370, y: 160, width: 300, height: 200, data: { systemPrompt: 'You are Fabre AI, a helpful software engineer assistant.', maxHistoryTurns: 10, messages: [] } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 720, y: 160, width: 280, height: 170, data: { temperature: 0.7 } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Conversation Timeline', x: 1050, y: 160, width: 280, height: 220, data: {} }
       ],
       links: [
-        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f4', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f5', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
-        { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
-        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
-        { id: 'link_d4', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
+        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_session_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_session_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_session_1', toPort: 'user-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_session_1', fromPort: 'session-out', toNode: 'node_llm_1', toPort: 'session-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_session_1', fromPort: 'messages-out', toNode: 'node_stream_1', toPort: 'messages-in', type: 'data' }
       ],
-      variables: { chat_history: '' }
+      variables: {}
     }
   },
   {
@@ -407,22 +404,22 @@ export const DEFAULT_RECENT_FILES = [
   },
   {
     id: 'sample_chat',
-    title: 'Simple Chat with Memory',
-    description: 'Combines prompt interpolation and variable storage to preserve chat responses in memory.',
+    title: 'Simple Query & Variable Memory',
+    description: 'Combines prompt template interpolation and variable storage to save LLM responses in memory.',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',
       version: '0.1.0',
       meta: {
-        title: 'Simple Chat with Memory',
-        description: 'Combines prompt interpolation and variable storage to preserve chat responses in memory.',
+        title: 'Simple Query & Variable Memory',
+        description: 'Combines prompt template interpolation and variable storage to save LLM responses in memory.',
         author: 'Fabre Team'
       },
       nodes: [
         { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, height: 140, data: { inputValue: 'What is WebAssembly?' } },
         { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, height: 170, data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' } },
         { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 } },
-        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1030, y: 160, width: 250, height: 170, data: { variableName: 'chat_history' } },
+        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1030, y: 160, width: 250, height: 170, data: { variableName: 'last_response' } },
         { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1330, y: 160, width: 240, height: 170, data: {} }
       ],
       links: [
@@ -435,7 +432,7 @@ export const DEFAULT_RECENT_FILES = [
         { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
         { id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
       ],
-      variables: { chat_history: '' }
+      variables: { last_response: '' }
     }
   }
 ];
@@ -444,13 +441,21 @@ export function initRecentFiles() {
   const saved = localStorage.getItem('fabre_recent_files');
   if (saved) {
     try {
-      state.recentFiles = JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Synchronize default sample files with latest definitions
+      state.recentFiles = parsed.map(file => {
+        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
+        return defaultSample ? defaultSample : file;
+      });
     } catch (e) {
       state.recentFiles = [...DEFAULT_RECENT_FILES];
     }
   } else {
     state.recentFiles = [...DEFAULT_RECENT_FILES];
   }
+  try {
+    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
+  } catch (e) {}
   state.emit('recentFilesChanged', state.recentFiles);
 }
 
