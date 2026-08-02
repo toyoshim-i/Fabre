@@ -628,10 +628,14 @@ export async function evaluateNode(node) {
       if (Array.isArray(messagesIn) && messagesIn.length > 0) {
         // Clear chat UI and populate from structured canonical messages array!
         clearChatMessages();
+        node.data.streamLogs = [];
         for (const msg of messagesIn) {
-          addChatMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+          const role = msg.role === 'user' ? 'user' : 'assistant';
+          addChatMessage(role, msg.content);
+          node.data.streamLogs.push({ role, text: msg.content, timestamp: new Date().toISOString() });
         }
         outputValue = messagesIn[messagesIn.length - 1]?.content || '';
+        import('./canvas.js').then(m => m.updateStreamViewContent(node));
       } else if (textIn) {
         let displayText = textIn;
         let displayRole = roleIn;
