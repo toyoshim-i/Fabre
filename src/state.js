@@ -437,45 +437,45 @@ export const DEFAULT_RECENT_FILES = [
   }
 ];
 
+function saveRecentFilesToStorage() {
+  try {
+    // Save metadata ONLY (id, title, description, filePath, updatedAt) - DO NOT store workflow content 'data' in localStorage
+    const metaOnly = state.recentFiles.map(({ data, ...meta }) => meta);
+    localStorage.setItem('fabre_recent_files', JSON.stringify(metaOnly));
+  } catch (e) {}
+}
+
 export function initRecentFiles() {
   const saved = localStorage.getItem('fabre_recent_files');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      // Synchronize default sample files with latest definitions
-      state.recentFiles = parsed.map(file => {
-        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
-        return defaultSample ? defaultSample : file;
-      });
+      // Strip any legacy 'data' payloads and keep metadata only
+      state.recentFiles = parsed.map(({ data, ...meta }) => meta);
     } catch (e) {
-      state.recentFiles = [...DEFAULT_RECENT_FILES];
+      state.recentFiles = DEFAULT_RECENT_FILES.map(({ data, ...meta }) => meta);
     }
   } else {
-    state.recentFiles = [...DEFAULT_RECENT_FILES];
+    state.recentFiles = DEFAULT_RECENT_FILES.map(({ data, ...meta }) => meta);
   }
-  try {
-    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
-  } catch (e) {}
+  saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }
 
 export function addRecentFile(fileObj) {
-  state.recentFiles = state.recentFiles.filter(f => f.title !== fileObj.title && f.id !== fileObj.id);
-  state.recentFiles.unshift(fileObj);
+  const { data, ...meta } = fileObj;
+  state.recentFiles = state.recentFiles.filter(f => f.title !== meta.title && f.id !== meta.id);
+  state.recentFiles.unshift(meta);
   if (state.recentFiles.length > 10) {
     state.recentFiles = state.recentFiles.slice(0, 10);
   }
-  try {
-    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
-  } catch (e) {}
+  saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }
 
 export function removeRecentFile(id) {
   state.recentFiles = state.recentFiles.filter(f => f.id !== id);
-  try {
-    localStorage.setItem('fabre_recent_files', JSON.stringify(state.recentFiles));
-  } catch (e) {}
+  saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }
 

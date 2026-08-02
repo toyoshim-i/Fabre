@@ -293,22 +293,36 @@ export function renderRecentFilesUI(recentFiles) {
         return;
       }
 
-      let workflowData = file.data;
+      let workflowData = null;
+
+      // 1. Fetch fresh workflow file from disk if filePath is provided
       if (file.filePath) {
         try {
           const res = await fetch(file.filePath);
           if (res.ok) {
             workflowData = await res.json();
-            file.data = workflowData;
-            file.updatedAt = new Date().toISOString();
-            addRecentFile(file); // Refresh cached contents
           }
         } catch (err) {
           console.warn(`Failed to fetch fresh workflow from ${file.filePath}:`, err);
         }
       }
 
+      // 2. If it is a built-in preset sample, fall back to DEFAULT_RECENT_FILES in state.js
+      if (!workflowData) {
+        const { DEFAULT_RECENT_FILES } = await import('./state.js');
+        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
+        if (defaultSample) {
+          workflowData = defaultSample.data;
+        }
+      }
+
+      // 3. Fall back to file.data if in memory during session
+      if (!workflowData && file.data) {
+        workflowData = file.data;
+      }
+
       if (workflowData) {
+        addRecentFile({ ...file, updatedAt: new Date().toISOString() });
         loadWorkflowData(workflowData, file.title);
       }
     });
