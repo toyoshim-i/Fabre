@@ -286,6 +286,15 @@ test('Model state mutations & events regression tests', async (t) => {
     await stepWorkflow(); // evaluates stream_view
     assert.strictEqual((streamNode.data.streamLogs || []).length, 1);
     assert.strictEqual(streamNode.data.streamLogs[0].text, 'Hello Event!');
+
+    // 4. Test stream_view evaluation with structured messages array (verifies clearChatMessages)
+    const sessionSourceNode = { id: 'sess1', type: 'session', title: 'Session Manager', x: 0, y: 0, width: 200, height: 100, data: { messages: [{ role: 'user', content: 'Turn 1' }] } };
+    addNode(sessionSourceNode);
+    addLink({ id: 'l_msg', fromNode: 'sess1', fromPort: 'messages-out', toNode: 'sv1', toPort: 'messages-in', type: 'data' });
+    
+    await stepWorkflow();
+    assert.strictEqual(state.chatMessages.length, 1);
+    assert.strictEqual(state.chatMessages[0].text, 'Turn 1');
   });
 
   await t.test('should accumulate multi-turn conversation history in set_var node', async () => {

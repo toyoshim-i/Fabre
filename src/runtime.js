@@ -11,7 +11,8 @@ import {
   setCurrentNodeId,
   incrementTotalSteps,
   resetRunner,
-  addChatMessage
+  addChatMessage,
+  clearChatMessages
 } from './state.js';
 import { runLlmQuery } from './llm.js?v=3';
 import { t } from './i18n.js';
