@@ -293,18 +293,21 @@ export function renderRecentFilesUI(recentFiles) {
         return;
       }
 
+      const { DEFAULT_RECENT_FILES } = await import('./state.js');
       let workflowData = file.data || null;
 
-      // 1. If it's a built-in sample preset, retrieve fresh definition from DEFAULT_RECENT_FILES in state.js
-      if (file.id && String(file.id).startsWith('sample_')) {
-        const { DEFAULT_RECENT_FILES } = await import('./state.js');
-        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
-        if (defaultSample) {
-          workflowData = defaultSample.data;
-        }
+      // 1. Fallback to matching default sample by ID or Title or FilePath
+      const defaultSample = DEFAULT_RECENT_FILES.find(d => 
+        d.id === file.id || 
+        d.title === file.title || 
+        (d.filePath && file.filePath && d.filePath === file.filePath)
+      );
+
+      if (defaultSample) {
+        workflowData = defaultSample.data;
       }
 
-      // 2. Fetch fresh workflow file from disk if filePath is provided
+      // 2. Fetch fresh workflow file from disk if filePath is provided and no data resolved yet
       if (!workflowData && file.filePath) {
         try {
           const res = await fetch(file.filePath);
@@ -314,6 +317,11 @@ export function renderRecentFilesUI(recentFiles) {
         } catch (err) {
           console.warn(`Failed to fetch fresh workflow from ${file.filePath}:`, err);
         }
+      }
+
+      // 3. Fallback to file.data
+      if (!workflowData && file.data) {
+        workflowData = file.data;
       }
 
       if (workflowData) {

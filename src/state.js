@@ -471,16 +471,27 @@ export function initRecentFiles() {
     loadedList = [...DEFAULT_RECENT_FILES];
   }
 
-  // Hydrate memory:
-  // For samples, force-attach fresh data payload from DEFAULT_RECENT_FILES
-  state.recentFiles = loadedList.map(file => {
-    const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
-    if (defaultSample) {
-      return { ...defaultSample, ...file, data: defaultSample.data };
+  // Auto-migrate and sanitize recent files list:
+  // 1. Force-hydrate and update all built-in preset samples with fresh definitions
+  const updatedList = [];
+  DEFAULT_RECENT_FILES.forEach(defaultSample => {
+    const existing = loadedList.find(f => f.id === defaultSample.id || f.title === defaultSample.title);
+    if (existing) {
+      updatedList.push({ ...defaultSample, ...existing, id: defaultSample.id, title: defaultSample.title, data: defaultSample.data });
+    } else {
+      updatedList.push({ ...defaultSample });
     }
-    return file;
   });
 
+  // 2. Preserve user-created custom projects
+  loadedList.forEach(file => {
+    const isSample = DEFAULT_RECENT_FILES.some(d => d.id === file.id || d.title === file.title);
+    if (!isSample && !updatedList.some(u => u.id === file.id)) {
+      updatedList.push(file);
+    }
+  });
+
+  state.recentFiles = updatedList;
   saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }
