@@ -58,6 +58,15 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(sessionNode.data.messages[1].role, 'assistant');
     assert.ok(sessionNode.data.messages[1].content.length > 0);
 
+    // Verify StreamView canvas card display logs population
+    const streamNode = state.nodes.find(n => n.id === 'node_stream_1');
+    assert.ok(streamNode, 'StreamView node node_stream_1 must exist');
+    assert.ok(Array.isArray(streamNode.data.streamLogs) && streamNode.data.streamLogs.length === 2, 'StreamView streamLogs must contain 2 messages');
+    assert.strictEqual(streamNode.data.streamLogs[0].role, 'user');
+    assert.strictEqual(streamNode.data.streamLogs[0].text, 'What is WebAssembly?');
+    assert.strictEqual(streamNode.data.streamLogs[1].role, 'assistant');
+    assert.ok(streamNode.data.streamLogs[1].text.length > 0);
+
     // Ensure loop returned to event_wait in paused state without any error logs
     assert.strictEqual(state.runnerState, 'paused');
     assert.strictEqual(state.logs.some(l => l.type === 'error'), false, 'No error logs should be produced');
