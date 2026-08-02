@@ -33,6 +33,7 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(state.runnerState, 'success');
     assert.ok(state.variables.last_response, 'state.variables.last_response should contain LLM output');
     assert.strictEqual(typeof state.variables.last_response, 'string');
+    assert.strictEqual(state.logs.some(l => l.type === 'error'), false, 'No error logs should be produced');
   });
 
   await t.test('2. End-to-End Infinite Chat (e2e-infinite-chat.fabre / sample_chat_e2e)', async () => {
@@ -56,6 +57,10 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(sessionNode.data.messages[0].content, 'What is WebAssembly?');
     assert.strictEqual(sessionNode.data.messages[1].role, 'assistant');
     assert.ok(sessionNode.data.messages[1].content.length > 0);
+
+    // Ensure loop returned to event_wait in paused state without any error logs
+    assert.strictEqual(state.runnerState, 'paused');
+    assert.strictEqual(state.logs.some(l => l.type === 'error'), false, 'No error logs should be produced');
   });
 
   await t.test('3. JS Sandbox Browser Alert Agent (js-sandbox-alert-agent.fabre / sample_js_sandbox_alert)', async () => {
@@ -79,6 +84,9 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     const toolNode = state.nodes.find(n => n.id === 'node_tool_1');
     assert.ok(toolNode);
     assert.ok(toolNode.data.lastToolResult.includes('JS executed successfully') || toolNode.data.lastToolResult.includes('Executed js_sandbox code'));
+
+    assert.strictEqual(state.runnerState, 'paused');
+    assert.strictEqual(state.logs.some(l => l.type === 'error'), false, 'No error logs should be produced');
   });
 
   await t.test('4. Self-Debugging Agent Loop (self-fixing-loop.fabre / sample_loop)', async () => {
