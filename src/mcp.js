@@ -168,6 +168,9 @@ export function updateGlobalMcpTools() {
   });
 
   state.mcpTools = allTools;
+  try {
+    localStorage.setItem('fabre_settings_mcp_servers', JSON.stringify(state.mcpServers));
+  } catch (e) {}
   state.emit('mcpToolsChanged', state.mcpTools);
 }
 

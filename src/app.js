@@ -2,6 +2,7 @@
 // Module Entrypoint & Event Coordinator
 'use strict';
 
+import { registerMcpServer } from './mcp.js';
 import { 
   state, 
   NODE_TYPES, 
@@ -196,6 +197,19 @@ document.addEventListener('DOMContentLoaded', () => {
   setApiEndpoint(savedApiEndpoint);
   setApiModel(savedApiModel);
   setApiKey(savedApiKey);
+
+  // Load saved MCP servers
+  const savedMcpServersRaw = localStorage.getItem('fabre_settings_mcp_servers');
+  if (savedMcpServersRaw) {
+    try {
+      const savedServers = JSON.parse(savedMcpServersRaw);
+      if (Array.isArray(savedServers)) {
+        savedServers.forEach(srv => {
+          registerMcpServer(srv.url, srv.name);
+        });
+      }
+    } catch (e) {}
+  }
 
   initSettingsUI();
   initRecentFiles();

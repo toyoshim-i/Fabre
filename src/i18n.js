@@ -157,7 +157,12 @@ export const DICTIONARY = {
   loaded_workflow: { en: 'Loaded workflow: {title}', ja: 'ワークフロー「{title}」を読み込みました。' },
   exported_fabre: { en: 'Exported project as .fabre file.', ja: 'プロジェクト (.fabre) を保存・ダウンロードしました。' },
   failed_load_file: { en: 'Failed to load .fabre file: {error}', ja: 'ファイル読み込み失敗: {error}' },
-  confirm_clear_canvas: { en: 'Are you sure you want to clear the entire canvas?', ja: 'キャンバス上のすべてのノードと接続を消去しますか？' }
+  confirm_clear_canvas: { en: 'Are you sure you want to clear the entire canvas?', ja: 'キャンバス上のすべてのノードと接続を消去しますか？' },
+  mcp_name_placeholder: { en: 'e.g. Local MCP Server', ja: '例: ローカル MCP サーバー' },
+  mcp_url_placeholder: { en: 'http://localhost:3000/sse', ja: 'http://localhost:3000/sse' },
+  config_apikey_placeholder: { en: 'Enter API Key if needed', ja: 'APIキーを入力（必要な場合のみ）' },
+  config_model_placeholder: { en: 'qwen2.5-coder:7b', ja: 'qwen2.5-coder:7b' },
+  config_url_placeholder: { en: 'http://localhost:11434/v1', ja: 'http://localhost:11434/v1' },
 };
 
 /**
@@ -198,6 +203,14 @@ export function updateDomTranslations() {
     const key = el.getAttribute('data-i18n-title');
     if (key && DICTIONARY[key]) {
       el.setAttribute('title', t(key));
+    }
+  });
+
+  const placeholderElements = document.querySelectorAll('[data-i18n-placeholder]');
+  placeholderElements.forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key && DICTIONARY[key]) {
+      el.setAttribute('placeholder', t(key));
     }
   });
 }

@@ -1260,17 +1260,41 @@ export function updateVariablesUI() {
  * Synchronize settings panel UI values with initial state values
  */
 export function initSettingsUI() {
+  const langSelect = document.getElementById('settings-language');
+  if (langSelect) {
+    langSelect.value = state.lang;
+    langSelect.addEventListener('change', (e) => setLanguage(e.target.value));
+  }
+
+  const themeSelect = document.getElementById('settings-theme');
+  if (themeSelect) {
+    themeSelect.value = state.theme;
+    themeSelect.addEventListener('change', (e) => setTheme(e.target.value));
+  }
+
   const provider = document.getElementById('settings-provider');
-  if (provider) provider.value = state.llmProvider;
+  if (provider) {
+    provider.value = state.llmProvider;
+    provider.addEventListener('change', (e) => setLlmProvider(e.target.value));
+  }
   
   const url = document.getElementById('settings-api-url');
-  if (url) url.value = state.apiEndpoint || '';
+  if (url) {
+    url.value = state.apiEndpoint || '';
+    url.addEventListener('input', (e) => setApiEndpoint(e.target.value));
+  }
   
   const model = document.getElementById('settings-api-model');
-  if (model) model.value = state.apiModel || '';
+  if (model) {
+    model.value = state.apiModel || '';
+    model.addEventListener('input', (e) => setApiModel(e.target.value));
+  }
   
   const key = document.getElementById('settings-api-key');
-  if (key) key.value = state.apiKey || '';
+  if (key) {
+    key.value = state.apiKey || '';
+    key.addEventListener('input', (e) => setApiKey(e.target.value));
+  }
 
   const addMcpBtn = document.getElementById('add-mcp-server-btn');
   if (addMcpBtn) {
