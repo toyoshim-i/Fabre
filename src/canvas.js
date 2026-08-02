@@ -142,8 +142,7 @@ export function initCanvasListeners() {
     const card = document.getElementById(id);
     if (card) {
       card.style.width = `${width}px`;
-      card.style.minHeight = `${height}px`;
-      card.style.height = 'auto';
+      card.style.height = `${height}px`;
       drawConnections();
     }
   });
@@ -178,9 +177,10 @@ export function initCanvasListeners() {
     } else if (node.type === NODE_TYPES.TOOL && key === 'toolType') {
       const cardToolDiv = card.querySelector('.node-body div div');
       if (cardToolDiv) cardToolDiv.innerText = value;
-    } else if (node.type === NODE_TYPES.OUTPUT && key === 'outputLabel') {
-      const inlineInput = card.querySelector('.inline-edit[data-prop="outputLabel"]');
-      if (inlineInput) inlineInput.value = value;
+    } else if (node.type === NODE_TYPES.STREAM_VIEW) {
+      updateStreamViewContent(node);
+    } else if (node.type === NODE_TYPES.OUTPUT) {
+      updateOutputNodeContent(node);
     }
   });
   
@@ -240,7 +240,7 @@ export function renderNode(node) {
   card.style.top = `${node.y}px`;
   card.style.width = `${node.width || 280}px`;
   if (node.height) {
-    card.style.minHeight = `${node.height}px`;
+    card.style.height = `${node.height}px`;
   }
   
   const template = PORT_TEMPLATES[node.type];
@@ -254,7 +254,7 @@ export function renderNode(node) {
       </div>
       <button class="node-delete-btn" title="Delete Node">&times;</button>
     </div>
-    <div class="node-body">
+    <div class="node-body" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
   `;
 
   if (node.type === NODE_TYPES.START) {
@@ -296,9 +296,9 @@ export function renderNode(node) {
       });
     }
     html += `
-      <div class="node-field-group">
+      <div class="node-field-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
         <label data-i18n="node_stream_view">Stream View</label>
-        <div class="stream-logs-box" style="max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
+        <div class="stream-logs-box" style="flex: 1 1 auto; min-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
           ${streamHtml}
         </div>
       </div>
@@ -306,9 +306,9 @@ export function renderNode(node) {
   } else if (node.type === NODE_TYPES.OUTPUT) {
     const valDisplay = node.data.lastOutputValue ? escapeHtml(String(node.data.lastOutputValue)) : '<i style="color: var(--text-muted);" data-i18n="output_empty_placeholder">(No output result yet)</i>';
     html += `
-      <div class="node-field-group">
+      <div class="node-field-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
         <label data-i18n="node_output_result">Final Output Result</label>
-        <div class="output-result-box" style="max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">
+        <div class="output-result-box" style="flex: 1 1 auto; min-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">
           ${valDisplay}
         </div>
       </div>
