@@ -1,7 +1,7 @@
 // LLM Provider Integrations (Chrome Built-in AI & OpenAI-compatible APIs)
 'use strict';
 
-import { state, getDefaultSystemPrompt, setLlmProvider } from './state.js';
+import { state, getDefaultSystemPrompt, setLlmProvider, normalizeString, normalizeNodeData } from './state.js';
 import { log, showCorsErrorModal, showAlert, applyLanguage } from './ui.js';
 
 /**
@@ -381,35 +381,34 @@ function generateSmartMockLlmResponse(systemPrompt, userPrompt, options) {
  * @returns {object} Fully resolved configuration
  */
 export function resolveLlmConfig(overrides = {}) {
-  const provider = (overrides.providerOverride && overrides.providerOverride !== 'inherit') 
-    ? overrides.providerOverride 
-    : (overrides.llmProviderOverride && overrides.llmProviderOverride !== 'inherit')
-    ? overrides.llmProviderOverride
-    : (overrides.llmProvider && overrides.llmProvider !== 'inherit')
-    ? overrides.llmProvider
+  const normalizedOverrides = normalizeNodeData(overrides);
+
+  const provider = (normalizedOverrides.providerOverride && normalizedOverrides.providerOverride !== 'inherit') 
+    ? normalizedOverrides.providerOverride 
+    : (normalizedOverrides.llmProviderOverride && normalizedOverrides.llmProviderOverride !== 'inherit')
+    ? normalizedOverrides.llmProviderOverride
+    : (normalizedOverrides.llmProvider && normalizedOverrides.llmProvider !== 'inherit')
+    ? normalizedOverrides.llmProvider
     : state.llmProvider;
 
-  const endpoint = (overrides.endpointOverride !== undefined && overrides.endpointOverride !== '') 
-    ? overrides.endpointOverride.trim() 
-    : (overrides.apiEndpoint !== undefined && overrides.apiEndpoint !== '')
-    ? overrides.apiEndpoint.trim()
-    : state.apiEndpoint;
+  const endpoint = normalizeString(normalizedOverrides.endpointOverride)
+    || normalizeString(normalizedOverrides.apiEndpoint)
+    || normalizeString(state.apiEndpoint)
+    || 'http://localhost:11434/v1';
 
-  const model = (overrides.modelOverride !== undefined && overrides.modelOverride !== '') 
-    ? overrides.modelOverride.trim() 
-    : (overrides.apiModel !== undefined && overrides.apiModel !== '')
-    ? overrides.apiModel.trim()
-    : state.apiModel;
+  const model = normalizeString(normalizedOverrides.modelOverride)
+    || normalizeString(normalizedOverrides.apiModel)
+    || normalizeString(state.apiModel)
+    || 'qwen2.5-coder:7b';
 
-  const apiKey = (overrides.apiKeyOverride !== undefined && overrides.apiKeyOverride !== '') 
-    ? overrides.apiKeyOverride 
-    : (overrides.apiKey !== undefined && overrides.apiKey !== '')
-    ? overrides.apiKey
-    : state.apiKey;
+  const apiKey = normalizeString(normalizedOverrides.apiKeyOverride)
+    || normalizeString(normalizedOverrides.apiKey)
+    || normalizeString(state.apiKey)
+    || '';
 
-  const temperature = (overrides.temperatureOverride !== undefined && overrides.temperatureOverride !== null && overrides.temperatureOverride !== '')
-    ? Number(overrides.temperatureOverride)
-    : (overrides.temperature !== undefined && overrides.temperature !== null && overrides.temperature !== '' ? Number(overrides.temperature) : 0.7);
+  const temperature = (normalizedOverrides.temperatureOverride !== undefined && normalizedOverrides.temperatureOverride !== null && normalizedOverrides.temperatureOverride !== '')
+    ? Number(normalizedOverrides.temperatureOverride)
+    : (normalizedOverrides.temperature !== undefined && normalizedOverrides.temperature !== null && normalizedOverrides.temperature !== '' ? Number(normalizedOverrides.temperature) : 0.7);
 
   return {
     provider,

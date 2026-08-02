@@ -184,4 +184,28 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(resolved.temperature, 0.2);
   });
 
+  await t.test('8. Edge case: resolveLlmConfig with null property overrides (hydrated UI node state)', async () => {
+    const { resolveLlmConfig } = await import('../src/llm.js');
+    
+    state.llmProvider = 'openai-compatible';
+    state.apiEndpoint = 'http://localhost:11434/v1';
+    state.apiModel = 'qwen2.5-coder:7b';
+    state.apiKey = 'global-key';
+
+    // Hydrated UI nodes pass null for empty form fields
+    const resolved = resolveLlmConfig({
+      llmProviderOverride: null,
+      endpointOverride: null,
+      modelOverride: null,
+      apiKeyOverride: null,
+      temperatureOverride: null
+    });
+
+    assert.strictEqual(resolved.provider, 'openai-compatible');
+    assert.strictEqual(resolved.endpoint, 'http://localhost:11434/v1');
+    assert.strictEqual(resolved.model, 'qwen2.5-coder:7b');
+    assert.strictEqual(resolved.apiKey, 'global-key');
+    assert.strictEqual(resolved.temperature, 0.7);
+  });
+
 });

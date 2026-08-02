@@ -3,6 +3,35 @@
 
 const _listeners = {};
 
+/**
+ * Canonical Value Normalizer for Strings
+ * Unifies null, undefined, empty strings, and whitespace into clean string or null.
+ * @param {*} val Any input value
+ * @returns {string|null} Trimmed string if non-empty, otherwise null
+ */
+export function normalizeString(val) {
+  if (val === null || val === undefined) return null;
+  const str = String(val).trim();
+  return str === '' ? null : str;
+}
+
+/**
+ * Normalize node data properties into canonical types
+ * Ensures node properties never carry inconsistent null/undefined/empty string representations.
+ */
+export function normalizeNodeData(data = {}) {
+  if (!data || typeof data !== 'object') return {};
+  const normalized = { ...data };
+  
+  ['modelOverride', 'endpointOverride', 'apiKeyOverride', 'llmProviderOverride', 'providerOverride'].forEach(key => {
+    if (key in normalized) {
+      normalized[key] = normalizeString(normalized[key]);
+    }
+  });
+
+  return normalized;
+}
+
 export const state = {
   // Localization & Themes
   lang: 'ja', // 'en' | 'ja'
