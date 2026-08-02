@@ -241,7 +241,7 @@ export function initRunnerControls() {
   if (runBtn) runBtn.addEventListener('click', runWorkflow);
 
   const stepBtn = document.getElementById('step-btn');
-  if (stepBtn) stepBtn.addEventListener('click', stepWorkflow);
+  if (stepBtn) stepBtn.addEventListener('click', () => stepWorkflow(true));
 
   const pauseBtn = document.getElementById('pause-btn');
   if (pauseBtn) pauseBtn.addEventListener('click', pauseWorkflow);

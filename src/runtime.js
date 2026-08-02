@@ -21,7 +21,7 @@ let stepTimer = null;
 /**
  * Execute a single step of the workflow starting from current node or Start node
  */
-export async function stepWorkflow() {
+export async function stepWorkflow(isSingleStep = false) {
   if (state.nodes.length === 0) {
     addLog(t('canvas_empty_log'), 'warning');
     return;
@@ -71,8 +71,10 @@ export async function stepWorkflow() {
 
     if (nextLink) {
       setCurrentNodeId(nextLink.toNode);
-      if (state.runnerState !== 'paused') {
-        setRunnerState('paused'); // Step execution pauses after 1 step
+      if (isSingleStep) {
+        setRunnerState('paused'); // Single step execution explicitly pauses
+      } else {
+        setRunnerState('running'); // Continuous execution loop remains running
       }
     } else {
       setRunnerState('success');
@@ -99,7 +101,7 @@ export async function runWorkflow() {
   const loop = async () => {
     if (state.runnerState !== 'running') return;
     
-    await stepWorkflow();
+    await stepWorkflow(false);
 
     if (state.runnerState === 'running') {
       stepTimer = setTimeout(loop, Math.max(50, state.executionDelay));
