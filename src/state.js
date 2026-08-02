@@ -439,9 +439,16 @@ export const DEFAULT_RECENT_FILES = [
 
 function saveRecentFilesToStorage() {
   try {
-    // Save metadata ONLY (id, title, description, filePath, updatedAt) - DO NOT store workflow content 'data' in localStorage
-    const metaOnly = state.recentFiles.map(({ data, ...meta }) => meta);
-    localStorage.setItem('fabre_recent_files', JSON.stringify(metaOnly));
+    // For built-in samples (id starts with 'sample_'), strip 'data' to keep storage lightweight.
+    // For user-created/saved workflows, preserve 'data' so project content persists across reloads!
+    const sanitized = state.recentFiles.map(file => {
+      if (file.id && String(file.id).startsWith('sample_')) {
+        const { data, ...meta } = file;
+        return meta;
+      }
+      return file;
+    });
+    localStorage.setItem('fabre_recent_files', JSON.stringify(sanitized));
   } catch (e) {}
 }
 
@@ -450,22 +457,26 @@ export function initRecentFiles() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      // Strip any legacy 'data' payloads and keep metadata only
-      state.recentFiles = parsed.map(({ data, ...meta }) => meta);
+      state.recentFiles = parsed.map(file => {
+        if (file.id && String(file.id).startsWith('sample_')) {
+          const { data, ...meta } = file;
+          return meta;
+        }
+        return file;
+      });
     } catch (e) {
-      state.recentFiles = DEFAULT_RECENT_FILES.map(({ data, ...meta }) => meta);
+      state.recentFiles = [...DEFAULT_RECENT_FILES];
     }
   } else {
-    state.recentFiles = DEFAULT_RECENT_FILES.map(({ data, ...meta }) => meta);
+    state.recentFiles = [...DEFAULT_RECENT_FILES];
   }
   saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }
 
 export function addRecentFile(fileObj) {
-  const { data, ...meta } = fileObj;
-  state.recentFiles = state.recentFiles.filter(f => f.title !== meta.title && f.id !== meta.id);
-  state.recentFiles.unshift(meta);
+  state.recentFiles = state.recentFiles.filter(f => f.title !== fileObj.title && f.id !== fileObj.id);
+  state.recentFiles.unshift(fileObj);
   if (state.recentFiles.length > 10) {
     state.recentFiles = state.recentFiles.slice(0, 10);
   }

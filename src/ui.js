@@ -293,10 +293,19 @@ export function renderRecentFilesUI(recentFiles) {
         return;
       }
 
-      let workflowData = null;
+      let workflowData = file.data || null;
 
-      // 1. Fetch fresh workflow file from disk if filePath is provided
-      if (file.filePath) {
+      // 1. If it's a built-in sample preset, retrieve fresh definition from DEFAULT_RECENT_FILES in state.js
+      if (file.id && String(file.id).startsWith('sample_')) {
+        const { DEFAULT_RECENT_FILES } = await import('./state.js');
+        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
+        if (defaultSample) {
+          workflowData = defaultSample.data;
+        }
+      }
+
+      // 2. Fetch fresh workflow file from disk if filePath is provided
+      if (!workflowData && file.filePath) {
         try {
           const res = await fetch(file.filePath);
           if (res.ok) {
@@ -307,22 +316,8 @@ export function renderRecentFilesUI(recentFiles) {
         }
       }
 
-      // 2. If it is a built-in preset sample, fall back to DEFAULT_RECENT_FILES in state.js
-      if (!workflowData) {
-        const { DEFAULT_RECENT_FILES } = await import('./state.js');
-        const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
-        if (defaultSample) {
-          workflowData = defaultSample.data;
-        }
-      }
-
-      // 3. Fall back to file.data if in memory during session
-      if (!workflowData && file.data) {
-        workflowData = file.data;
-      }
-
       if (workflowData) {
-        addRecentFile({ ...file, updatedAt: new Date().toISOString() });
+        addRecentFile({ ...file, data: workflowData, updatedAt: new Date().toISOString() });
         loadWorkflowData(workflowData, file.title);
       }
     });
