@@ -319,6 +319,8 @@ export function renderRecentFilesUI(recentFiles) {
       if (workflowData) {
         addRecentFile({ ...file, data: workflowData, updatedAt: new Date().toISOString() });
         loadWorkflowData(workflowData, file.title);
+      } else {
+        addLog(t('failed_load_file', { error: 'Workflow data not found' }), 'error');
       }
     });
 

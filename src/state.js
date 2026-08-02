@@ -438,9 +438,11 @@ export const DEFAULT_RECENT_FILES = [
 ];
 
 function saveRecentFilesToStorage() {
+  if (typeof localStorage === 'undefined') return;
   try {
-    // For built-in samples (id starts with 'sample_'), strip 'data' to keep storage lightweight.
-    // For user-created/saved workflows, preserve 'data' so project content persists across reloads!
+    // For built-in samples (id starts with 'sample_'), strip 'data' from localStorage
+    // to avoid storing stale preset payloads in browser storage.
+    // For user-created workflows, preserve 'data' so projects persist!
     const sanitized = state.recentFiles.map(file => {
       if (file.id && String(file.id).startsWith('sample_')) {
         const { data, ...meta } = file;
@@ -453,23 +455,32 @@ function saveRecentFilesToStorage() {
 }
 
 export function initRecentFiles() {
-  const saved = localStorage.getItem('fabre_recent_files');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      state.recentFiles = parsed.map(file => {
-        if (file.id && String(file.id).startsWith('sample_')) {
-          const { data, ...meta } = file;
-          return meta;
-        }
-        return file;
-      });
-    } catch (e) {
-      state.recentFiles = [...DEFAULT_RECENT_FILES];
+  let loadedList = [];
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('fabre_recent_files');
+    if (saved) {
+      try {
+        loadedList = JSON.parse(saved);
+      } catch (e) {
+        loadedList = [...DEFAULT_RECENT_FILES];
+      }
+    } else {
+      loadedList = [...DEFAULT_RECENT_FILES];
     }
   } else {
-    state.recentFiles = [...DEFAULT_RECENT_FILES];
+    loadedList = [...DEFAULT_RECENT_FILES];
   }
+
+  // Hydrate memory:
+  // For samples, force-attach fresh data payload from DEFAULT_RECENT_FILES
+  state.recentFiles = loadedList.map(file => {
+    const defaultSample = DEFAULT_RECENT_FILES.find(d => d.id === file.id);
+    if (defaultSample) {
+      return { ...defaultSample, ...file, data: defaultSample.data };
+    }
+    return file;
+  });
+
   saveRecentFilesToStorage();
   state.emit('recentFilesChanged', state.recentFiles);
 }

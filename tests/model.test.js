@@ -22,6 +22,8 @@ import {
   clearVariables,
   resetRunner,
   addLog,
+  clearLogs,
+  initRecentFiles,
   NODE_TYPES
 } from '../src/state.js';
 import { 
@@ -415,6 +417,54 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(sessionVal.messages.length, 1);
     assert.strictEqual(sessionVal.messages[0].role, 'user');
     assert.strictEqual(sessionVal.messages[0].content, 'Hello AI!');
+  });
+
+  await t.test('should clear debug console logs and emit logsCleared event', async () => {
+    addLog('Test log 1');
+    addLog('Test log 2');
+    assert.strictEqual(state.logs.length >= 2, true);
+
+    let clearedFired = false;
+    state.on('logsCleared', () => { clearedFired = true; });
+
+    clearLogs();
+    assert.strictEqual(state.logs.length, 0);
+    assert.strictEqual(clearedFired, true);
+  });
+
+  await t.test('should initialize and hydrate recent files with sample workflow data', async () => {
+    initRecentFiles();
+    assert.strictEqual(state.recentFiles.length >= 4, true);
+
+    const sampleChat = state.recentFiles.find(f => f.id === 'sample_chat');
+    assert.ok(sampleChat);
+    assert.ok(sampleChat.data);
+    assert.strictEqual(sampleChat.data.nodes.length, 5);
+
+    const setVarNode = sampleChat.data.nodes.find(n => n.type === 'set_var');
+    assert.strictEqual(setVarNode.data.variableName, 'last_response');
+  });
+
+  await t.test('should load workflow data onto state canvas cleanly', async () => {
+    const { loadWorkflowData } = await import('../src/ui.js');
+    const testData = {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      nodes: [
+        { id: 'n1', type: NODE_TYPES.START, title: 'Start', data: { inputValue: 'Test' } },
+        { id: 'n2', type: NODE_TYPES.OUTPUT, title: 'Output', data: {} }
+      ],
+      links: [
+        { id: 'l1', fromNode: 'n1', fromPort: 'flow-out', toNode: 'n2', toPort: 'flow-in', type: 'flow' }
+      ],
+      variables: { test_var: 'hello' }
+    };
+
+    loadWorkflowData(testData, 'Test Load');
+
+    assert.strictEqual(state.nodes.length, 2);
+    assert.strictEqual(state.links.length, 1);
+    assert.strictEqual(state.variables.test_var, 'hello');
   });
 
 });
