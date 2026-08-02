@@ -537,15 +537,43 @@ function updateLlmProviderUI(provider) {
   }
 }
 
+let currentConsoleFilter = 'all';
+
+export function setupConsoleLogFilter() {
+  const filterSelect = document.getElementById('console-log-filter');
+  if (filterSelect) {
+    filterSelect.addEventListener('change', (e) => {
+      currentConsoleFilter = e.target.value;
+      reRenderAllLogs();
+    });
+  }
+}
+
+function reRenderAllLogs() {
+  const container = document.getElementById('logs-container');
+  if (!container) return;
+  container.innerHTML = '';
+  const filtered = (state.logs || []).filter(e => currentConsoleFilter === 'all' || e.type === currentConsoleFilter);
+  if (filtered.length === 0) {
+    container.innerHTML = `<span class="placeholder-text" data-i18n="logs_empty">${t('logs_empty')}</span>`;
+    return;
+  }
+  filtered.forEach(entry => renderLogEntry(entry, true));
+}
+
 /**
  * Render log entry DOM element in log console panel
  */
-function renderLogEntry(entry) {
+function renderLogEntry(entry, isBulk = false) {
   const { timestamp, text, type, details } = entry;
   const container = document.getElementById('logs-container');
   if (!container) return;
   
-  if (state.logs.length === 1) {
+  if (!isBulk && currentConsoleFilter !== 'all' && type !== currentConsoleFilter) {
+    return;
+  }
+
+  if (!isBulk && state.logs.length === 1) {
     container.innerHTML = '';
   }
   
@@ -554,7 +582,8 @@ function renderLogEntry(entry) {
   
   const metaEl = document.createElement('div');
   metaEl.className = 'log-meta';
-  metaEl.innerHTML = `<span>[${type.toUpperCase()}]</span><span>${timestamp}</span>`;
+  const badgeLabel = type === 'http' ? 'HTTP/API' : type.toUpperCase();
+  metaEl.innerHTML = `<span class="log-badge ${type}">[${badgeLabel}]</span><span>${timestamp}</span>`;
   entryEl.appendChild(metaEl);
   
   const textEl = document.createElement('div');
@@ -1257,4 +1286,5 @@ export function initSettingsUI() {
 
   renderMcpServersUI();
   updateLlmProviderUI(state.llmProvider);
+  setupConsoleLogFilter();
 }

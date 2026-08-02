@@ -380,13 +380,16 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(state.mcpTools.length, 0);
   });
 
-  await t.test('should enforce requireToolCall and set runnerState to error when plain text returned', async () => {
+  await t.test('should support tool-call-out port output resolution', async () => {
     clearCanvasState();
     resetRunner();
-    addNode({ id: 'llm1', type: NODE_TYPES.LLM, title: 'LLM Call', data: { requireToolCall: true, maxRetries: 1 } });
-    state.currentNodeId = 'llm1';
-    await stepWorkflow();
-    assert.strictEqual(state.runnerState, 'error');
+    addNode({ id: 'llm1', type: NODE_TYPES.LLM, title: 'LLM Call', data: { lastToolCall: 'alert("HELLO")' } });
+    addNode({ id: 'tool1', type: NODE_TYPES.TOOL, title: 'JS Sandbox', data: { toolType: 'js_sandbox' } });
+    addLink({ id: 'l1', fromNode: 'llm1', fromPort: 'tool-call-out', toNode: 'tool1', toPort: 'data-in', type: 'data' });
+    
+    const { getPortInputValue } = await import('../src/runtime.js');
+    const inputVal = getPortInputValue('tool1', 'data-in');
+    assert.strictEqual(inputVal, 'alert("HELLO")');
   });
 
 });

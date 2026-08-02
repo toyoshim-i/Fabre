@@ -217,6 +217,9 @@ function getSourceNodeOutputValue(sourceNode, portId) {
     return sourceNode.data.lastCompiledPrompt || sourceNode.data.promptTemplate || '';
   }
   if (sourceNode.type === NODE_TYPES.LLM) {
+    if (portId === 'tool-call-out') {
+      return sourceNode.data.lastToolCall !== undefined ? sourceNode.data.lastToolCall : (sourceNode.data.lastResponse || '');
+    }
     return sourceNode.data.lastResponse || '';
   }
   if (sourceNode.type === NODE_TYPES.EXTRACTOR) {
@@ -293,14 +296,33 @@ async function evaluateNode(node) {
           lastResult = await runLlmQuery(systemPrompt, currentPrompt, temp, null, llmOptions);
           outputValue = lastResult.content || '';
 
+          const isToolPortConnected = state.links.some(l => l.fromNode === node.id && l.fromPort === 'tool-call-out');
+
           // 1. Structured Function Calling (OpenAI / Tool Calls schema)
           if (lastResult.type === 'tool_calls' && lastResult.tool_calls.length > 0) {
-            addLog(t('react_tool_detected', { tool: lastResult.tool_calls[0].function?.name || 'MCP Tool' }), 'info');
-            for (const call of lastResult.tool_calls) {
-              const toolName = call.function.name;
-              const toolArgs = call.function.arguments;
-              const toolResult = await executeLocalTool(`mcp:${toolName}`, toolArgs);
-              outputValue += `\n\n[Tool Output: ${toolName}]\n${toolResult}`;
+            const firstCall = lastResult.tool_calls[0];
+            const toolName = firstCall.function?.name || 'js_sandbox';
+            const rawArgs = firstCall.function?.arguments || '';
+
+            let cleanToolInput = rawArgs;
+            try {
+              const parsedArgs = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+              cleanToolInput = parsedArgs.code || parsedArgs.input || parsedArgs.filePath || rawArgs;
+            } catch (e) {}
+
+            node.data.lastToolCall = cleanToolInput;
+
+            if (isToolPortConnected) {
+              addLog(t('llm_tool_call_emitted', { tool: toolName }), 'info', `[Tool Call Emitted via tool-call-out]\nTool: ${toolName}\nPayload: ${cleanToolInput}`);
+              if (!outputValue) outputValue = cleanToolInput;
+            } else {
+              addLog(t('llm_tool_call_unwired_warning', { tool: toolName }), 'warning', `[WARN]: LLM emitted tool call '${toolName}', but 'tool-call-out' port on [${node.title}] is not connected to a Tool Exec node.\n\nExecuting tool locally as fallback.\nPayload: ${cleanToolInput}`);
+              for (const call of lastResult.tool_calls) {
+                const tName = call.function.name;
+                const tArgs = call.function.arguments;
+                const toolResult = await executeLocalTool(`mcp:${tName}`, tArgs);
+                outputValue += `\n\n[Tool Output: ${tName}]\n${toolResult}`;
+              }
             }
             break;
           }
@@ -309,9 +331,14 @@ async function evaluateNode(node) {
           if (node.data.enableTools) {
             const reactMatch = parseReActToolCall(outputValue);
             if (reactMatch) {
-              addLog(t('react_tool_detected', { tool: reactMatch.tool }), 'info');
-              const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
-              outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
+              node.data.lastToolCall = reactMatch.input;
+              if (isToolPortConnected) {
+                addLog(t('llm_tool_call_emitted', { tool: reactMatch.tool }), 'info');
+              } else {
+                addLog(t('llm_tool_call_unwired_warning', { tool: reactMatch.tool }), 'warning', `[WARN]: ReAct pattern detected tool call '${reactMatch.tool}', but 'tool-call-out' port is not connected.\nExecuting tool locally as fallback.`);
+                const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
+                outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
+              }
               break;
             }
           }

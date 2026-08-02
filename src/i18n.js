@@ -38,7 +38,8 @@ export const DICTIONARY = {
   recent_projects_title: { en: 'Recent Projects', ja: '最近のプロジェクト' },
   no_recent_projects: { en: 'No recent projects found.', ja: '最近開いたプロジェクトはありません。' },
   tab_memory: { en: 'Memory', ja: '変数メモリ' },
-  tab_logs: { en: 'Logs', ja: 'ログ・履歴' },
+  tab_logs: { en: 'Debug Console', ja: 'デバッグコンソール' },
+  tab_console: { en: 'Debug Console', ja: 'デバッグコンソール' },
   tab_config: { en: 'Config', ja: '設定' },
 
   // MCP Server Management
@@ -52,6 +53,8 @@ export const DICTIONARY = {
   mcp_connect_failed: { en: 'Failed to connect to MCP server [{name}]: {error}', ja: 'MCP サーバー [{name}] への接続に失敗しました: {error}' },
   mcp_executing_tool: { en: 'Executing MCP Tool [{tool}] on {url}...', ja: 'MCP ツール [{tool}] を {url} で実行中...' },
   llm_retry_tool_required: { en: 'LLM returned plain text instead of a tool call. Retrying with directive (Attempt {attempt}/{max})...', ja: 'LLMがツール呼び出しではなく平文を返却しました。指示を強化して再試行中 (試行 {attempt}/{max})...' },
+  llm_tool_call_emitted: { en: 'LLM emitted tool call [{tool}] via tool-call-out port', ja: 'LLMが tool-call-out ポートからツール呼び出し [{tool}] を出力しました' },
+  llm_tool_call_unwired_warning: { en: 'LLM produced tool call [{tool}], but tool-call-out port is not connected.', ja: 'LLMがツール呼び出し [{tool}] を出力しましたが、tool-call-out ポートが未接続です。' },
 
   // Execution Debugger Controls
   runner_control_title: { en: 'Execution Control', ja: 'ワークフロー実行制御' },

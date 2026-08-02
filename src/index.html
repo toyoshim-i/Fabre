@@ -247,14 +247,23 @@
             </div>
           </div>
 
-          <!-- 3. LLM Request/Response Logs -->
+          <!-- 3. Debug Console & HTTP Traces -->
           <div id="tab-logs" class="tab-content">
-            <div class="panel-section-header">
-              <h4 data-i18n="logs_title">Logs & LLM History</h4>
-              <button id="clear-logs-btn" class="btn btn-secondary btn-xs" data-i18n="btn_clear">Clear</button>
+            <div class="panel-section-header" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <h4 data-i18n="tab_console">Debug Console</h4>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <select id="console-log-filter" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 4px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);">
+                  <option value="all">All Logs</option>
+                  <option value="http">HTTP / API</option>
+                  <option value="warning">Warnings</option>
+                  <option value="error">Errors</option>
+                  <option value="info">Info</option>
+                </select>
+                <button id="clear-logs-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;" data-i18n="btn_clear">Clear</button>
+              </div>
             </div>
             <div id="logs-container" class="console-logs">
-              <span class="placeholder-text" data-i18n="logs_empty">Logs will appear here during execution...</span>
+              <span class="placeholder-text" data-i18n="logs_empty">Debug logs and HTTP traces will appear here...</span>
             </div>
           </div>
 

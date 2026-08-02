@@ -542,7 +542,8 @@ export const PORT_TEMPLATES = {
     outputs: [
       { id: 'flow-success', name: 'Success', type: 'flow' },
       { id: 'flow-error', name: 'Error', type: 'flow' },
-      { id: 'response-out', name: 'Response', type: 'data' }
+      { id: 'response-out', name: 'Response', type: 'data' },
+      { id: 'tool-call-out', name: 'Tool Call', type: 'data' }
     ]
   },
   extractor: {
