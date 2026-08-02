@@ -158,6 +158,7 @@ export const DICTIONARY = {
   exported_fabre: { en: 'Exported project as .fabre file.', ja: 'プロジェクト (.fabre) を保存・ダウンロードしました。' },
   failed_load_file: { en: 'Failed to load .fabre file: {error}', ja: 'ファイル読み込み失敗: {error}' },
   confirm_clear_canvas: { en: 'Are you sure you want to clear the entire canvas?', ja: 'キャンバス上のすべてのノードと接続を消去しますか？' },
+  btn_remove_recent: { en: 'Remove from list', ja: 'リストから削除' },
   mcp_name_placeholder: { en: 'e.g. Local MCP Server', ja: '例: ローカル MCP サーバー' },
   mcp_url_placeholder: { en: 'http://localhost:3000/sse', ja: 'http://localhost:3000/sse' },
   config_apikey_placeholder: { en: 'Enter API Key if needed', ja: 'APIキーを入力（必要な場合のみ）' },

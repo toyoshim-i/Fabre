@@ -206,23 +206,24 @@
 
           <!-- Files & Projects Explorer Panel -->
           <div id="tab-files" class="tab-content">
-            <!-- Recent Projects Section -->
-            <div class="recent-files-section" style="margin-bottom: 16px;">
+            <!-- Target Directory Explorer (Primary focus at top) -->
+            <div class="panel-section-header" style="margin-bottom: 8px;">
+              <h4 data-i18n="dir_title">Target Directory</h4>
+              <button id="connect-dir-sidebar-btn" class="btn btn-secondary btn-xs" data-i18n="btn_connect_dir">Connect</button>
+            </div>
+            <div id="file-tree" class="file-tree-list" style="margin-bottom: 16px;">
+              <span class="placeholder-text" data-i18n="dir_placeholder">Connect a directory to browse files</span>
+            </div>
+
+            <!-- Recent Projects Section (Secondary focus below directory) -->
+            <div class="recent-files-section border-top" style="padding-top: 12px;">
               <div class="recent-files-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <h4 data-i18n="recent_projects_title">Recent Projects</h4>
-                <button id="clear-recent-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;">Clear</button>
+                <button id="clear-recent-btn" class="btn btn-secondary btn-xs" style="font-size: 10px; padding: 2px 6px;" data-i18n="btn_clear">Clear</button>
               </div>
               <div id="recent-files-list" class="recent-files-list">
                 <!-- Dynamically populated recent project cards -->
               </div>
-            </div>
-
-            <div class="panel-section-header border-top" style="padding-top: 12px;">
-              <h4 data-i18n="dir_title">Target Directory</h4>
-              <button id="connect-dir-sidebar-btn" class="btn btn-secondary btn-xs" data-i18n="btn_connect_dir">Connect</button>
-            </div>
-            <div id="file-tree" class="file-tree-list">
-              <span class="placeholder-text" data-i18n="dir_placeholder">Connect a directory to browse files</span>
             </div>
           </div>
 

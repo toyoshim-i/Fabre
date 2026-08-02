@@ -216,15 +216,16 @@ export function renderRecentFilesUI(recentFiles) {
   recentFiles.forEach(file => {
     const card = document.createElement('div');
     card.className = 'recent-file-card';
+    const dateFormatted = new Date(file.updatedAt).toLocaleDateString(state.lang === 'ja' ? 'ja-JP' : 'en-US');
     card.innerHTML = `
       <div class="recent-file-card-header">
         <div class="recent-file-card-title">${file.title}</div>
-        <button class="recent-file-remove-btn" title="Remove from list">&times;</button>
+        <button class="recent-file-remove-btn" title="${t('btn_remove_recent')}">&times;</button>
       </div>
       <div class="recent-file-card-desc">${file.description || ''}</div>
       <div class="recent-file-card-footer">
         <span>.fabre</span>
-        <span>${new Date(file.updatedAt).toLocaleDateString()}</span>
+        <span>${dateFormatted}</span>
       </div>
     `;
 
