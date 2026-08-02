@@ -279,87 +279,49 @@ async function evaluateNode(node) {
       const promptInput = getPortInputValue(node.id, 'prompt-in') || node.data.lastCompiledPrompt || '';
       const systemPrompt = node.data.systemPrompt || 'You are a helpful software engineer assistant.';
       const temp = node.data.temperature !== undefined ? node.data.temperature : 0.7;
-      const requireToolCall = node.data.requireToolCall || false;
-      const maxRetries = node.data.maxRetries || 3;
+
+      // Automatically enable tools if tool-call-out port is connected to downstream node(s)
+      const isToolPortConnected = state.links.some(l => l.fromNode === node.id && l.fromPort === 'tool-call-out');
 
       const llmOptions = {
-        enableTools: node.data.enableTools || false,
+        enableTools: isToolPortConnected,
         tools: node.data.tools || null,
         returnStructured: true
       };
 
       try {
-        let currentPrompt = promptInput;
-        let lastResult = null;
+        const lastResult = await runLlmQuery(systemPrompt, promptInput, temp, null, llmOptions);
+        outputValue = lastResult.content || '';
 
-        for (let attempt = 0; attempt <= (requireToolCall ? maxRetries : 0); attempt++) {
-          lastResult = await runLlmQuery(systemPrompt, currentPrompt, temp, null, llmOptions);
-          outputValue = lastResult.content || '';
+        // 1. Structured Function Calling (OpenAI / Tool Calls schema)
+        if (lastResult.type === 'tool_calls' && lastResult.tool_calls.length > 0) {
+          const firstCall = lastResult.tool_calls[0];
+          const toolName = firstCall.function?.name || 'js_sandbox';
+          const rawArgs = firstCall.function?.arguments || '';
 
-          const isToolPortConnected = state.links.some(l => l.fromNode === node.id && l.fromPort === 'tool-call-out');
+          let cleanToolInput = rawArgs;
+          try {
+            const parsedArgs = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+            cleanToolInput = parsedArgs.code || parsedArgs.input || parsedArgs.filePath || rawArgs;
+          } catch (e) {}
 
-          // 1. Structured Function Calling (OpenAI / Tool Calls schema)
-          if (lastResult.type === 'tool_calls' && lastResult.tool_calls.length > 0) {
-            const firstCall = lastResult.tool_calls[0];
-            const toolName = firstCall.function?.name || 'js_sandbox';
-            const rawArgs = firstCall.function?.arguments || '';
+          node.data.lastToolCall = cleanToolInput;
 
-            let cleanToolInput = rawArgs;
-            try {
-              const parsedArgs = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
-              cleanToolInput = parsedArgs.code || parsedArgs.input || parsedArgs.filePath || rawArgs;
-            } catch (e) {}
-
-            node.data.lastToolCall = cleanToolInput;
-
-            if (isToolPortConnected) {
-              addLog(t('llm_tool_call_emitted', { tool: toolName }), 'info', `[Tool Call Emitted via tool-call-out]\nTool: ${toolName}\nPayload: ${cleanToolInput}`);
-              if (!outputValue) outputValue = cleanToolInput;
-            } else {
-              addLog(t('llm_tool_call_unwired_warning', { tool: toolName }), 'warning', `[WARN]: LLM emitted tool call '${toolName}', but 'tool-call-out' port on [${node.title}] is not connected to a Tool Exec node.\n\nExecuting tool locally as fallback.\nPayload: ${cleanToolInput}`);
-              for (const call of lastResult.tool_calls) {
-                const tName = call.function.name;
-                const tArgs = call.function.arguments;
-                const toolResult = await executeLocalTool(`mcp:${tName}`, tArgs);
-                outputValue += `\n\n[Tool Output: ${tName}]\n${toolResult}`;
-              }
-            }
-            break;
-          }
-
+          addLog(t('llm_tool_call_emitted', { tool: toolName }), 'info', `[Tool Call Emitted via tool-call-out]\nTool: ${toolName}\nPayload: ${cleanToolInput}`);
+          if (!outputValue) outputValue = cleanToolInput;
+        } else if (isToolPortConnected) {
           // 2. ReAct Pattern Regex Check (Fallback for non-native function call models)
-          if (node.data.enableTools) {
-            const reactMatch = parseReActToolCall(outputValue);
-            if (reactMatch) {
-              node.data.lastToolCall = reactMatch.input;
-              if (isToolPortConnected) {
-                addLog(t('llm_tool_call_emitted', { tool: reactMatch.tool }), 'info');
-              } else {
-                addLog(t('llm_tool_call_unwired_warning', { tool: reactMatch.tool }), 'warning', `[WARN]: ReAct pattern detected tool call '${reactMatch.tool}', but 'tool-call-out' port is not connected.\nExecuting tool locally as fallback.`);
-                const toolResult = await executeLocalTool(reactMatch.tool, reactMatch.input);
-                outputValue += `\n\n[Tool Output: ${reactMatch.tool}]\n${toolResult}`;
-              }
-              break;
-            }
+          const reactMatch = parseReActToolCall(outputValue);
+          if (reactMatch) {
+            node.data.lastToolCall = reactMatch.input;
+            addLog(t('llm_tool_call_emitted', { tool: reactMatch.tool }), 'info');
+            if (!outputValue) outputValue = reactMatch.input;
           }
-
-          // 3. Plain text returned when tool call was required
-          if (requireToolCall) {
-            if (attempt < maxRetries) {
-              addLog(t('llm_retry_tool_required', { attempt: attempt + 1, max: maxRetries }), 'warning');
-              currentPrompt = `${promptInput}\n\n[SYSTEM DIRECTIVE]: You returned plain text, but a tool call is required to process this request. You MUST call one of the provided tools now. Do not reply with text alone.`;
-              continue;
-            } else {
-              throw new Error(`LLM failed to issue a required Tool Call after ${maxRetries} retry attempts. Response received: "${outputValue}"`);
-            }
-          }
-
-          break;
         }
-
         node.data.lastResponse = outputValue;
         nextFlowPort = 'flow-success';
       } catch (err) {
+        addLog(`[Error in LLM Call ${node.title}]: ${err.message}`, 'error', err.stack);
         nextFlowPort = 'flow-error';
         throw err;
       }

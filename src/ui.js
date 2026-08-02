@@ -693,14 +693,6 @@ export function showNodeProperties(nodeId) {
         <label>${t.prop_llm_temp} (${node.data.temperature !== undefined ? node.data.temperature : 0.7})</label>
         <input type="range" id="prop-llm-temp" min="0.0" max="1.0" step="0.1" value="${node.data.temperature !== undefined ? node.data.temperature : 0.7}">
       </div>
-      <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px;">
-        <label for="prop-llm-tools">${t.prop_llm_tools}</label>
-        <input type="checkbox" id="prop-llm-tools" ${node.data.enableTools ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
-      </div>
-      <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px;">
-        <label for="prop-llm-require-tools">${state.lang === 'en' ? 'Require Tool Call (Retry on Text)' : 'ツール呼び出しを強制（平文時に再試行）'}</label>
-        <input type="checkbox" id="prop-llm-require-tools" ${node.data.requireToolCall ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
-      </div>
     `;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
     html += `
@@ -811,20 +803,6 @@ function wirePropertyControls(node) {
       const val = parseFloat(e.target.value);
       updateNodeData(node.id, 'temperature', val);
       tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${val})`;
-    });
-  }
-  
-  const toolsCheck = document.getElementById('prop-llm-tools');
-  if (toolsCheck) {
-    toolsCheck.addEventListener('change', (e) => {
-      updateNodeData(node.id, 'enableTools', e.target.checked);
-    });
-  }
-
-  const requireToolsCheck = document.getElementById('prop-llm-require-tools');
-  if (requireToolsCheck) {
-    requireToolsCheck.addEventListener('change', (e) => {
-      updateNodeData(node.id, 'requireToolCall', e.target.checked);
     });
   }
 
