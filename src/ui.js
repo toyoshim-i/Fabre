@@ -20,6 +20,7 @@ import {
   addRecentFile,
   removeRecentFile,
   clearChatMessages,
+  clearLogs,
   updateNodeTitle,
   updateNodeData,
   setSelectedNode,
@@ -567,6 +568,17 @@ export function setupConsoleLogFilter() {
       reRenderAllLogs();
     });
   }
+
+  const clearLogsBtn = document.getElementById('clear-logs-btn');
+  if (clearLogsBtn) {
+    clearLogsBtn.addEventListener('click', () => {
+      clearLogs();
+    });
+  }
+
+  state.on('logsCleared', () => {
+    reRenderAllLogs();
+  });
 }
 
 function reRenderAllLogs() {

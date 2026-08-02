@@ -227,6 +227,11 @@ export function addLog(text, type = 'info', details = null) {
   state.emit('logAdded', entry);
 }
 
+export function clearLogs() {
+  state.logs = [];
+  state.emit('logsCleared');
+}
+
 export function setRunnerState(runnerState) {
   state.runnerState = runnerState;
   state.emit('runnerStateChanged', runnerState);
