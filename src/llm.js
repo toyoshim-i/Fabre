@@ -53,20 +53,23 @@ export async function checkChromeAi() {
       } else if (typeof aiModel.availability === 'function') {
         available = await aiModel.availability();
       } else {
-        // Fallback assumption if namespace exists but capabilities functions are missing
-        available = 'readily';
+        // Strict fallback test when functions are missing
+        available = 'no';
       }
       
-      if (available === 'no') {
+      const isAvailable = (available === 'readily' || available === 'after-download' || available === true);
+
+      if (!isAvailable) {
         state.chromeAiAvailable = false;
         desc.innerText = state.lang === 'en'
           ? 'Chrome Built-in AI (window.ai) is supported by your browser, but the model is not downloaded or disabled. Enable flags and restart Chrome.'
           : 'Chrome 組み込み AI (window.ai) はサポートされていますが、モデルのダウンロードが未完了か、無効化されています。フラグの設定を確認してください。';
         statusBlock.className = 'info-block warning';
         badgeContainer.className = 'status-badge warning';
-        badge.setAttribute('data-i18n', 'status_llm_not_configured');
-        applyLanguage(state.lang); // Apply localized text
-        log('Chrome Built-in AI is disabled or requires model download.', 'warning');
+        badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
+        badge.removeAttribute('data-i18n');
+        log('Chrome Built-in AI is disabled or requires model download. Defaulting to OpenAI-compatible API.', 'warning');
+        updateLlmProvider('openai-compatible');
       } else {
         state.chromeAiAvailable = true;
         state.chromeAiCapabilities = capabilities;
@@ -86,8 +89,8 @@ export async function checkChromeAi() {
         : `Chrome 組み込み AI の検出エラー: ${err.message}。外部APIを選択してください。`;
       statusBlock.className = 'info-block warning';
       badgeContainer.className = 'status-badge warning';
-      badge.setAttribute('data-i18n', 'status_llm_not_configured');
-      applyLanguage(state.lang); // Apply localized text
+      badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
+      badge.removeAttribute('data-i18n');
       log(`Failed to initialize Chrome AI: ${err.message}`, 'error');
       updateLlmProvider('openai-compatible');
     }
@@ -98,8 +101,8 @@ export async function checkChromeAi() {
       : 'Chrome 組み込み AI (window.ai) はこのブラウザでサポートされていません。Chrome Dev/Canary でフラグを有効にするか、外部APIを指定してください。';
     statusBlock.className = 'info-block warning';
     badgeContainer.className = 'status-badge warning';
-    badge.setAttribute('data-i18n', 'status_llm_not_configured');
-    applyLanguage(state.lang); // Apply localized text
+    badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
+    badge.removeAttribute('data-i18n');
     log('Chrome Built-in AI is not supported. Defaulting to External API.', 'warning');
     updateLlmProvider('openai-compatible');
   }

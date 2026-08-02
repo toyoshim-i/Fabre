@@ -45,7 +45,7 @@ export const state = {
   activeFileText: '',
   
   // LLM Config
-  llmProvider: 'chrome-ai', // 'chrome-ai' | 'openai-compatible'
+  llmProvider: 'openai-compatible', // 'chrome-ai' | 'openai-compatible'
   apiEndpoint: 'http://localhost:11434/v1',
   apiModel: 'qwen2.5-coder:7b',
   apiKey: '',
