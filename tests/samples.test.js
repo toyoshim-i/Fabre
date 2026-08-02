@@ -160,4 +160,28 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     }
   });
 
+  await t.test('7. Unified LLM Config Resolver (resolveLlmConfig)', async () => {
+    const { resolveLlmConfig } = await import('../src/llm.js');
+    
+    // Global fallback
+    state.llmProvider = 'chrome-ai';
+    state.apiEndpoint = 'http://global:11434/v1';
+    state.apiModel = 'global-model';
+
+    // Local node override
+    const resolved = resolveLlmConfig({
+      llmProviderOverride: 'openai-compatible',
+      endpointOverride: 'http://custom-node:8080/v1',
+      modelOverride: 'custom-model',
+      apiKeyOverride: 'secret-key',
+      temperatureOverride: 0.2
+    });
+
+    assert.strictEqual(resolved.provider, 'openai-compatible');
+    assert.strictEqual(resolved.endpoint, 'http://custom-node:8080/v1');
+    assert.strictEqual(resolved.model, 'custom-model');
+    assert.strictEqual(resolved.apiKey, 'secret-key');
+    assert.strictEqual(resolved.temperature, 0.2);
+  });
+
 });

@@ -663,6 +663,104 @@ function renderLogEntry(entry, isBulk = false) {
 }
 
 /**
+ * Render unified LLM configuration overrides form fields for nodes (Session Manager, LLM Call, etc.)
+ */
+function renderLlmOverrideFormFields(data = {}, prefix = 'prop-node-llm') {
+  const currentProvider = data.llmProviderOverride || data.providerOverride || 'inherit';
+  const currentModel = data.modelOverride || '';
+  const currentEndpoint = data.endpointOverride || '';
+  const currentApiKey = data.apiKeyOverride || '';
+  const currentTemp = data.temperatureOverride !== undefined ? data.temperatureOverride : (data.temperature !== undefined ? data.temperature : '');
+
+  const isEn = state.lang === 'en';
+
+  return `
+    <div class="border-top" style="margin-top: 10px; padding-top: 10px; font-weight: 600; font-size: 11px; color: var(--accent-purple);">
+      ⚙️ ${isEn ? 'LLM Configuration Overrides' : 'LLM 設定の上書き（ノード固有）'}
+    </div>
+    <div class="form-group" style="margin-top: 6px;">
+      <label>${isEn ? 'LLM Provider' : 'LLM プロバイダー'}</label>
+      <select id="${prefix}-provider" class="node-input-select" style="width:100%; padding:6px; border-radius:6px; background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color);">
+        <option value="inherit" ${currentProvider === 'inherit' ? 'selected' : ''}>${isEn ? 'App Default (Inherit Global)' : 'アプリ標準設定（全体設定を引き継ぐ）'}</option>
+        <option value="chrome-ai" ${currentProvider === 'chrome-ai' ? 'selected' : ''}>Chrome Built-in AI (Gemini Nano)</option>
+        <option value="openai-compatible" ${currentProvider === 'openai-compatible' ? 'selected' : ''}>Custom OpenAI-compatible API</option>
+      </select>
+    </div>
+
+    <div class="${prefix}-openai-block ${currentProvider === 'chrome-ai' ? 'collapsed' : ''}">
+      <div class="form-group">
+        <label>${isEn ? 'Endpoint URL Override' : 'APIエンドポイント上書き'}</label>
+        <input type="text" id="${prefix}-endpoint" class="node-input-text" value="${currentEndpoint}" placeholder="e.g. http://localhost:11434/v1">
+      </div>
+
+      <div class="form-group">
+        <label>${isEn ? 'Model Name Override' : 'モデル名の上書き'}</label>
+        <input type="text" id="${prefix}-model" class="node-input-text" value="${currentModel}" placeholder="e.g. qwen2.5-coder:7b, gpt-4o" list="settings-model-datalist">
+      </div>
+
+      <div class="form-group">
+        <label>${isEn ? 'API Key Override' : 'APIキー上書き'}</label>
+        <input type="password" id="${prefix}-apikey" class="node-input-text" value="${currentApiKey}" placeholder="${isEn ? 'Leave empty to use global key' : '空欄時は全体設定のキーを使用'}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>${isEn ? 'Temperature Override (0.0 - 1.0)' : 'Temperature 上書き (0.0 - 1.0)'}</label>
+      <input type="number" id="${prefix}-temp" class="node-input-text" step="0.1" min="0.0" max="1.0" value="${currentTemp}" placeholder="${isEn ? 'e.g. 0.7 (Inherit if empty)' : '例: 0.7（未入力時は標準）'}">
+    </div>
+  `;
+}
+
+/**
+ * Bind event listeners for unified LLM configuration overrides form
+ */
+function bindLlmOverrideFormEvents(node, prefix = 'prop-node-llm') {
+  const providerEl = document.getElementById(`${prefix}-provider`);
+  if (providerEl) {
+    providerEl.addEventListener('change', (e) => {
+      const val = e.target.value;
+      updateNodeData(node.id, 'llmProviderOverride', val);
+      document.querySelectorAll(`.${prefix}-openai-block`).forEach(el => {
+        if (val === 'chrome-ai') el.classList.add('collapsed');
+        else el.classList.remove('collapsed');
+      });
+    });
+  }
+
+  const endpointEl = document.getElementById(`${prefix}-endpoint`);
+  if (endpointEl) {
+    endpointEl.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'endpointOverride', e.target.value);
+    });
+  }
+
+  const modelEl = document.getElementById(`${prefix}-model`);
+  if (modelEl) {
+    modelEl.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'modelOverride', e.target.value);
+    });
+  }
+
+  const apiKeyEl = document.getElementById(`${prefix}-apikey`);
+  if (apiKeyEl) {
+    apiKeyEl.addEventListener('input', (e) => {
+      updateNodeData(node.id, 'apiKeyOverride', e.target.value);
+    });
+  }
+
+  const tempEl = document.getElementById(`${prefix}-temp`);
+  if (tempEl) {
+    tempEl.addEventListener('input', (e) => {
+      const val = e.target.value === '' ? undefined : Number(e.target.value);
+      updateNodeData(node.id, 'temperatureOverride', val);
+      if (prefix === 'prop-llm') {
+        updateNodeData(node.id, 'temperature', val);
+      }
+    });
+  }
+}
+
+/**
  * Display selected node parameters in the inspector sidebar panel
  * @param {string} nodeId Node ID
  */
@@ -719,12 +817,7 @@ export function showNodeProperties(nodeId) {
       </div>
     `;
   } else if (node.type === NODE_TYPES.LLM) {
-    html += `
-      <div class="form-group">
-        <label>${t.prop_llm_temp} (${node.data.temperature !== undefined ? node.data.temperature : 0.7})</label>
-        <input type="range" id="prop-llm-temp" min="0.0" max="1.0" step="0.1" value="${node.data.temperature !== undefined ? node.data.temperature : 0.7}">
-      </div>
-    `;
+    html += renderLlmOverrideFormFields(node.data, 'prop-llm');
   } else if (node.type === NODE_TYPES.SESSION) {
     html += `
       <div class="form-group">
@@ -732,17 +825,10 @@ export function showNodeProperties(nodeId) {
         <textarea id="prop-session-system" class="node-input-text node-textarea" placeholder="You are a helpful assistant...">${node.data.systemPrompt || ''}</textarea>
       </div>
       <div class="form-group">
-        <label>${t.prop_session_model || (state.lang === 'en' ? 'Model Override (Optional)' : 'モデル名の上書き（任意）')}</label>
-        <input type="text" id="prop-session-model" class="node-input-text" value="${node.data.modelOverride || ''}" placeholder="e.g. gpt-4o, qwen2.5-coder:7b">
-      </div>
-      <div class="form-group">
-        <label>${t.prop_session_endpoint || (state.lang === 'en' ? 'Endpoint URL Override (Optional)' : 'APIエンドポイントの上書き（任意）')}</label>
-        <input type="text" id="prop-session-endpoint" class="node-input-text" value="${node.data.endpointOverride || ''}" placeholder="e.g. http://localhost:11434/v1">
-      </div>
-      <div class="form-group">
         <label>${t.prop_session_max_turns || (state.lang === 'en' ? 'Max History Turns' : '最大保持ターン数')}</label>
         <input type="number" id="prop-session-max-turns" class="node-input-text" min="1" max="100" value="${node.data.maxHistoryTurns || 10}">
       </div>
+      ${renderLlmOverrideFormFields(node.data, 'prop-session')}
     `;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
     html += `
@@ -853,43 +939,27 @@ function wirePropertyControls(node) {
   }
 
   // LLM Call Temperature / Checkbox tools
-  const tempRange = document.getElementById('prop-llm-temp');
-  if (tempRange) {
-    tempRange.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      updateNodeData(node.id, 'temperature', val);
-      tempRange.previousElementSibling.innerText = `${TRANSLATIONS[state.lang].prop_llm_temp} (${val})`;
-    });
+  if (node.type === NODE_TYPES.LLM) {
+    bindLlmOverrideFormEvents(node, 'prop-llm');
   }
 
-  // Session Manager inputs
-  const sessionSystem = document.getElementById('prop-session-system');
-  if (sessionSystem) {
-    sessionSystem.addEventListener('input', (e) => {
-      updateNodeData(node.id, 'systemPrompt', e.target.value);
-    });
-  }
+  if (node.type === NODE_TYPES.SESSION) {
+    const sessionSystem = document.getElementById('prop-session-system');
+    if (sessionSystem) {
+      sessionSystem.addEventListener('input', (e) => {
+        updateNodeData(node.id, 'systemPrompt', e.target.value);
+      });
+    }
 
-  const sessionModel = document.getElementById('prop-session-model');
-  if (sessionModel) {
-    sessionModel.addEventListener('input', (e) => {
-      updateNodeData(node.id, 'modelOverride', e.target.value);
-    });
-  }
+    const sessionMaxTurns = document.getElementById('prop-session-max-turns');
+    if (sessionMaxTurns) {
+      sessionMaxTurns.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10) || 10;
+        updateNodeData(node.id, 'maxHistoryTurns', val);
+      });
+    }
 
-  const sessionEndpoint = document.getElementById('prop-session-endpoint');
-  if (sessionEndpoint) {
-    sessionEndpoint.addEventListener('input', (e) => {
-      updateNodeData(node.id, 'endpointOverride', e.target.value);
-    });
-  }
-
-  const sessionMaxTurns = document.getElementById('prop-session-max-turns');
-  if (sessionMaxTurns) {
-    sessionMaxTurns.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10) || 10;
-      updateNodeData(node.id, 'maxHistoryTurns', val);
-    });
+    bindLlmOverrideFormEvents(node, 'prop-session');
   }
 
   // Extractor selections

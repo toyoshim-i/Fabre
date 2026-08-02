@@ -248,9 +248,12 @@ function getSourceNodeOutputValue(sourceNode, portId) {
         nodeId: sourceNode.id,
         messages: sourceNode.data.messages || [],
         systemPrompt: sourceNode.data.systemPrompt || '',
+        llmProviderOverride: sourceNode.data.llmProviderOverride || sourceNode.data.providerOverride || '',
+        providerOverride: sourceNode.data.llmProviderOverride || sourceNode.data.providerOverride || '',
         modelOverride: sourceNode.data.modelOverride || '',
         endpointOverride: sourceNode.data.endpointOverride || '',
         apiKeyOverride: sourceNode.data.apiKeyOverride || '',
+        temperatureOverride: sourceNode.data.temperatureOverride,
         maxHistoryTurns: sourceNode.data.maxHistoryTurns || 10
       };
     }
@@ -343,11 +346,22 @@ export async function evaluateNode(node) {
         node.data.messages = node.data.messages.slice(-maxMessages);
       }
 
-      outputValue = node.data.messages;
+      const sessionPayload = {
+        nodeId: node.id,
+        messages: node.data.messages,
+        systemPrompt: node.data.systemPrompt,
+        llmProviderOverride: node.data.llmProviderOverride || node.data.providerOverride,
+        modelOverride: node.data.modelOverride,
+        endpointOverride: node.data.endpointOverride,
+        apiKeyOverride: node.data.apiKeyOverride,
+        temperatureOverride: node.data.temperatureOverride
+      };
+
+      outputValue = node.data.messages || [];
       addLog(
         state.lang === 'en' ? `Session Manager [${node.title}] updated memory` : `対話セッション [${node.title}] メモリ更新完了`,
         'info',
-        `[Session Node]\nID: ${node.id}\nTitle: ${node.title}\nTotal Messages: ${node.data.messages.length}\nMax History Turns: ${maxTurns}\n\n[Model Override]\n${node.data.modelOverride || '(None - Using Global Default)'}\n\n[Endpoint Override]\n${node.data.endpointOverride || '(None - Using Global Default)'}\n\n[Structured Canonical Messages Payload]\n${JSON.stringify(node.data.messages, null, 2)}`
+        `[Session Node]\nID: ${node.id}\nTitle: ${node.title}\nTotal Messages: ${node.data.messages.length}\nMax History Turns: ${maxTurns}\n\n[Provider Override]\n${node.data.llmProviderOverride || node.data.providerOverride || '(Inherit Global)'}\n\n[Model Override]\n${node.data.modelOverride || '(Inherit Global)'}\n\n[Endpoint Override]\n${node.data.endpointOverride || '(Inherit Global)'}\n\n[Structured Canonical Messages Payload]\n${JSON.stringify(node.data.messages, null, 2)}`
       );
       break;
     }
@@ -355,31 +369,39 @@ export async function evaluateNode(node) {
     case NODE_TYPES.LLM: {
       const promptInput = getPortInputValue(node.id, 'prompt-in') || node.data.lastCompiledPrompt || '';
       let systemPrompt = node.data.systemPrompt || 'You are a helpful software engineer assistant.';
-      const temp = node.data.temperature !== undefined ? node.data.temperature : 0.7;
+      
+      let effectiveProvider = node.data.llmProviderOverride || node.data.providerOverride || null;
+      let effectiveModel = node.data.modelOverride || null;
+      let effectiveEndpoint = node.data.endpointOverride || null;
+      let effectiveApiKey = node.data.apiKeyOverride || null;
+      let effectiveTemperature = node.data.temperatureOverride !== undefined ? node.data.temperatureOverride : node.data.temperature;
+      let targetSessionNode = null;
 
       // Check if session-in is connected
       const sessionContext = getPortInputValue(node.id, 'session-in');
       let canonicalMessagesPayload = null;
-      let effectiveModel = null;
-      let effectiveEndpoint = null;
-      let effectiveApiKey = null;
-      let targetSessionNode = null;
 
       if (sessionContext && typeof sessionContext === 'object') {
         const sessionNodeId = sessionContext.nodeId;
         targetSessionNode = state.nodes.find(n => n.id === sessionNodeId);
         
-        if (sessionContext.systemPrompt) {
+        if (sessionContext.systemPrompt && !node.data.systemPrompt) {
           systemPrompt = sessionContext.systemPrompt;
         }
-        if (sessionContext.modelOverride) {
+        if (!effectiveProvider && (sessionContext.llmProviderOverride || sessionContext.providerOverride)) {
+          effectiveProvider = sessionContext.llmProviderOverride || sessionContext.providerOverride;
+        }
+        if (!effectiveModel && sessionContext.modelOverride) {
           effectiveModel = sessionContext.modelOverride;
         }
-        if (sessionContext.endpointOverride) {
+        if (!effectiveEndpoint && sessionContext.endpointOverride) {
           effectiveEndpoint = sessionContext.endpointOverride;
         }
-        if (sessionContext.apiKeyOverride) {
+        if (!effectiveApiKey && sessionContext.apiKeyOverride) {
           effectiveApiKey = sessionContext.apiKeyOverride;
+        }
+        if (effectiveTemperature === undefined && sessionContext.temperatureOverride !== undefined) {
+          effectiveTemperature = sessionContext.temperatureOverride;
         }
 
         // Build canonical messages array
@@ -400,14 +422,16 @@ export async function evaluateNode(node) {
         enableTools: isToolPortConnected,
         tools: node.data.tools || null,
         returnStructured: true,
+        providerOverride: effectiveProvider,
         modelOverride: effectiveModel,
         endpointOverride: effectiveEndpoint,
         apiKeyOverride: effectiveApiKey,
+        temperatureOverride: effectiveTemperature,
         messagesPayload: canonicalMessagesPayload
       };
 
       try {
-        const lastResult = await runLlmQuery(systemPrompt, promptInput, temp, null, llmOptions);
+        const lastResult = await runLlmQuery(systemPrompt, promptInput, effectiveTemperature, null, llmOptions);
         outputValue = lastResult.content || '';
 
         // 1. Structured Function Calling (OpenAI / Tool Calls schema)

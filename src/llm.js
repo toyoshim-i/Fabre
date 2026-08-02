@@ -372,6 +372,51 @@ function generateSmartMockLlmResponse(systemPrompt, userPrompt, options) {
   return 'WebAssembly (Wasm) is a binary instruction format for a stack-based virtual machine, designed as a portable compilation target for high-performance web applications.';
 }
 
+/**
+ * Resolve effective LLM configuration by merging local node overrides with global state defaults.
+ * @param {Object} [overrides={}] Local overrides
+ * @returns {object} Fully resolved configuration
+ */
+export function resolveLlmConfig(overrides = {}) {
+  const provider = (overrides.providerOverride && overrides.providerOverride !== 'inherit') 
+    ? overrides.providerOverride 
+    : (overrides.llmProviderOverride && overrides.llmProviderOverride !== 'inherit')
+    ? overrides.llmProviderOverride
+    : (overrides.llmProvider && overrides.llmProvider !== 'inherit')
+    ? overrides.llmProvider
+    : state.llmProvider;
+
+  const endpoint = (overrides.endpointOverride !== undefined && overrides.endpointOverride !== '') 
+    ? overrides.endpointOverride.trim() 
+    : (overrides.apiEndpoint !== undefined && overrides.apiEndpoint !== '')
+    ? overrides.apiEndpoint.trim()
+    : state.apiEndpoint;
+
+  const model = (overrides.modelOverride !== undefined && overrides.modelOverride !== '') 
+    ? overrides.modelOverride.trim() 
+    : (overrides.apiModel !== undefined && overrides.apiModel !== '')
+    ? overrides.apiModel.trim()
+    : state.apiModel;
+
+  const apiKey = (overrides.apiKeyOverride !== undefined && overrides.apiKeyOverride !== '') 
+    ? overrides.apiKeyOverride 
+    : (overrides.apiKey !== undefined && overrides.apiKey !== '')
+    ? overrides.apiKey
+    : state.apiKey;
+
+  const temperature = (overrides.temperatureOverride !== undefined && overrides.temperatureOverride !== null && overrides.temperatureOverride !== '')
+    ? Number(overrides.temperatureOverride)
+    : (overrides.temperature !== undefined && overrides.temperature !== null && overrides.temperature !== '' ? Number(overrides.temperature) : 0.7);
+
+  return {
+    provider,
+    endpoint,
+    model,
+    apiKey,
+    temperature
+  };
+}
+
 export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, signal = null, options = {}) {
   if (state.useMockLlm || state.mockLlmHandler) {
     if (typeof state.mockLlmHandler === 'function') {
@@ -389,6 +434,7 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     return options.returnStructured ? { type: 'text', content: mockContent } : mockContent;
   }
 
+  const llmConfig = resolveLlmConfig({ ...options, temperatureOverride: options.temperatureOverride !== undefined ? options.temperatureOverride : temperature });
   let responseContent = '';
   let toolCalls = null;
   
@@ -400,14 +446,14 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     canonicalMessages.unshift({ role: 'system', content: systemPrompt });
   }
 
-  if (state.llmProvider === 'chrome-ai') {
+  if (llmConfig.provider === 'chrome-ai') {
     const aiModel = getChromeAiInterface();
     if (!aiModel || !state.chromeAiAvailable) {
       throw new Error(state.lang === 'en' ? 'Chrome Built-in AI is not available or enabled.' : 'Chrome 組み込み AI が利用不可または無効です。');
     }
     
     // Create new LanguageModel session for isolation
-    const sessionOptions = { temperature: temperature };
+    const sessionOptions = { temperature: llmConfig.temperature };
     if (systemPrompt) {
       sessionOptions.systemPrompt = systemPrompt;
     }
@@ -442,7 +488,7 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     }
   } else {
     // External OpenAI-compatible API call
-    let rawEndpoint = (options.endpointOverride || state.apiEndpoint || '').trim();
+    let rawEndpoint = llmConfig.endpoint;
     if (!rawEndpoint) {
       throw new Error(state.lang === 'en' ? 'API Endpoint URL is not configured in settings or session override.' : 'APIエンドポイントURLが設定されていません。');
     }
@@ -456,12 +502,11 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     }
     
     const headers = { 'Content-Type': 'application/json' };
-    const effectiveApiKey = options.apiKeyOverride || state.apiKey;
-    if (effectiveApiKey) {
-      headers['Authorization'] = `Bearer ${effectiveApiKey}`;
+    if (llmConfig.apiKey) {
+      headers['Authorization'] = `Bearer ${llmConfig.apiKey}`;
     }
     
-    let selectedModel = (options.modelOverride || state.apiModel || '').trim();
+    let selectedModel = llmConfig.model;
     if (!selectedModel) {
       const datalist = document.getElementById ? document.getElementById('settings-model-datalist') : null;
       if (datalist && datalist.options && datalist.options.length > 0) {
@@ -474,7 +519,7 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     const body = {
       model: selectedModel,
       messages: canonicalMessages.map(m => ({ role: m.role, content: m.content })),
-      temperature: temperature
+      temperature: llmConfig.temperature
     };
 
     // Inject tool definitions for OpenAI Function Calling if provided or enabled
