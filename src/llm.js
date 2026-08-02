@@ -553,5 +553,12 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     'http',
     `[Response Content]\n${responseContent || '(No plain text output)'}${toolCalls ? `\n\n[Tool Calls Received]\n${JSON.stringify(toolCalls, null, 2)}` : ''}`
   );
+  if (options.returnStructured) {
+    if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+      return { type: 'tool_calls', content: responseContent, tool_calls: toolCalls };
+    }
+    return { type: 'text', content: responseContent };
+  }
+
   return responseContent;
 }

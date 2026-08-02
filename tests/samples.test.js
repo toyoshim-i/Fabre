@@ -115,4 +115,49 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(state.currentNodeId, 'node_out_pass');
   });
 
+  await t.test('6. Real OpenAI Raw JSON Payload Parsing Compatibility', async () => {
+    setUseMockLlm(false); // Test real runLlmQuery payload parsing logic!
+    const origProvider = state.llmProvider;
+    state.llmProvider = 'openai-compatible';
+    const origFetch = globalThis.fetch;
+    
+    // Mock fetch returning the exact raw response format provided by user
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "chatcmpl-2o58gkl2wd46lolgewda0s",
+        object: "chat.completion",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "WebAssembly (Wasm) is a way to take code written in C++ or Rust and run it in the browser.",
+              tool_calls: []
+            },
+            finish_reason: "stop"
+          }
+        ]
+      })
+    });
+
+    try {
+      const { runLlmQuery } = await import('../src/llm.js');
+      const result = await runLlmQuery('System Prompt', 'User Query', 0.7, null, {
+        returnStructured: true,
+        endpointOverride: 'http://localhost:11434/v1',
+        modelOverride: 'gemma-4-e2b-it'
+      });
+
+      assert.strictEqual(typeof result, 'object', 'Result must be a structured object');
+      assert.strictEqual(result.type, 'text');
+      assert.strictEqual(result.content.includes('WebAssembly'), true);
+    } finally {
+      globalThis.fetch = origFetch;
+      state.llmProvider = origProvider;
+      setUseMockLlm(true);
+    }
+  });
+
 });
