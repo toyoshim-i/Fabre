@@ -199,7 +199,30 @@ export function clearVariables() {
 
 export function addLog(text, type = 'info', details = null) {
   const timestamp = new Date().toLocaleTimeString();
-  const entry = { timestamp, text, type, details };
+
+  let formattedText = text;
+  if (typeof text === 'object' && text !== null) {
+    try {
+      formattedText = text.message ? `${text.name || 'Error'}: ${text.message}` : JSON.stringify(text, null, 2);
+    } catch (e) {
+      formattedText = String(text);
+    }
+  } else {
+    formattedText = String(text !== undefined && text !== null ? text : '');
+  }
+
+  let formattedDetails = details;
+  if (typeof details === 'object' && details !== null) {
+    try {
+      formattedDetails = JSON.stringify(details, null, 2);
+    } catch (e) {
+      formattedDetails = String(details);
+    }
+  } else if (details !== null && details !== undefined) {
+    formattedDetails = String(details);
+  }
+
+  const entry = { timestamp, text: formattedText, type, details: formattedDetails };
   state.logs.push(entry);
   state.emit('logAdded', entry);
 }

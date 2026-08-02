@@ -443,13 +443,8 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
       state.lang === 'en'
         ? `Sending query to External API via endpoint: ${endpoint}`
         : `外部APIエンドポイント: ${endpoint} へクエリを送信中...`,
-      'info',
-      `[POST Endpoint] ${endpoint}/chat/completions
-[Headers]
-${JSON.stringify(loggedHeaders, null, 2)}
-
-[Request Body]
-${JSON.stringify(body, null, 2)}`
+      'http',
+      `[POST Endpoint] ${endpoint}/chat/completions\n\n[Headers]\n${JSON.stringify(loggedHeaders, null, 2)}\n\n[Request Body]\n${JSON.stringify(body, null, 2)}`
     );
     
     const response = await fetch(`${endpoint}/chat/completions`, {
@@ -465,7 +460,7 @@ ${JSON.stringify(body, null, 2)}`
         const errorData = await response.json();
         if (errorData && errorData.error) {
           errorMsg = typeof errorData.error === 'object' 
-            ? (errorData.error.message || JSON.stringify(errorData.error)) 
+            ? (errorData.error.message || JSON.stringify(errorData.error, null, 2)) 
             : errorData.error;
         } else if (errorData && errorData.message) {
           errorMsg = errorData.message;
@@ -498,8 +493,8 @@ ${JSON.stringify(body, null, 2)}`
 
   log(
     state.lang === 'en' ? 'LLM response received successfully.' : 'LLMからの応答を受信しました。',
-    'success',
-    `[Response Content]\n${responseContent}`
+    'http',
+    `[Response Content]\n${responseContent || '(No plain text output)'}${toolCalls ? `\n\n[Tool Calls Received]\n${JSON.stringify(toolCalls, null, 2)}` : ''}`
   );
   return responseContent;
 }
