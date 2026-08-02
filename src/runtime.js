@@ -13,7 +13,7 @@ import {
   resetRunner,
   addChatMessage
 } from './state.js';
-import { runLlmQuery } from './llm.js';
+import { runLlmQuery } from './llm.js?v=3';
 import { t } from './i18n.js';
 
 let stepTimer = null;

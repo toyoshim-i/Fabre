@@ -27,7 +27,7 @@ import {
   addLog,
   setExecutionDelay
 } from './state.js';
-import { runLlmQuery } from './llm.js';
+import { runLlmQuery } from './llm.js?v=3';
 import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow, runChatTurn } from './runtime.js';
 import { drawConnections } from './canvas.js';
 import { t, updateDomTranslations } from './i18n.js';
