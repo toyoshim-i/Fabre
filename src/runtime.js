@@ -14,7 +14,8 @@ import {
   addChatMessage,
   clearChatMessages
 } from './state.js';
-import { runLlmQuery } from './llm.js?v=3';
+import { runLlmQuery, getAllAvailableToolsForOpenAi } from './llm.js?v=3';
+import { resolveToolConfig } from './mcp.js';
 import { t } from './i18n.js';
 
 let stepTimer = null;
@@ -200,11 +201,30 @@ export async function runChatTurn(userMessage) {
   }
 }
 
+function getPortAliases(portId) {
+  if (['input-in', 'data-in', 'text-in', 'input', 'data'].includes(portId)) {
+    return ['input-in', 'data-in', 'text-in', 'input', 'data'];
+  }
+  if (['output-out', 'data-out', 'text-out', 'extracted-out', 'output', 'data', 'prompt-out', 'response-out'].includes(portId)) {
+    return ['output-out', 'data-out', 'text-out', 'extracted-out', 'output', 'data', 'prompt-out', 'response-out'];
+  }
+  return [];
+}
+
 /**
  * Resolve data input for a given node port by following incoming links
  */
 export function getPortInputValue(nodeId, portId) {
-  const incomingLink = state.links.find(l => l.toNode === nodeId && l.toPort === portId);
+  let incomingLink = state.links.find(l => l.toNode === nodeId && l.toPort === portId);
+  
+  if (!incomingLink) {
+    const aliases = getPortAliases(portId);
+    for (const alias of aliases) {
+      incomingLink = state.links.find(l => l.toNode === nodeId && l.toPort === alias);
+      if (incomingLink) break;
+    }
+  }
+
   if (!incomingLink) return null;
 
   const sourceNode = state.nodes.find(n => n.id === incomingLink.fromNode);
@@ -340,6 +360,20 @@ export async function evaluateNode(node) {
         }
       }
 
+      // 3. If tool result text received, push to messages array
+      const toolResultIn = getPortInputValue(node.id, 'tool-result-in');
+      if (toolResultIn && typeof toolResultIn === 'string' && toolResultIn.trim()) {
+        const lastMsg = node.data.messages[node.data.messages.length - 1];
+        const formattedToolMsg = `[Tool Execution Result]\n${toolResultIn.trim()}`;
+        if (!lastMsg || lastMsg.content !== formattedToolMsg) {
+          node.data.messages.push({
+            role: 'tool',
+            content: formattedToolMsg,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+
       // 3. Sliding window turns trimming
       const maxTurns = node.data.maxHistoryTurns || 10;
       const maxMessages = maxTurns * 2;
@@ -363,6 +397,22 @@ export async function evaluateNode(node) {
         state.lang === 'en' ? `Session Manager [${node.title}] updated memory` : `対話セッション [${node.title}] メモリ更新完了`,
         'info',
         `[Session Node]\nID: ${node.id}\nTitle: ${node.title}\nTotal Messages: ${node.data.messages.length}\nMax History Turns: ${maxTurns}\n\n[Provider Override]\n${node.data.llmProviderOverride || node.data.providerOverride || '(Inherit Global)'}\n\n[Model Override]\n${node.data.modelOverride || '(Inherit Global)'}\n\n[Endpoint Override]\n${node.data.endpointOverride || '(Inherit Global)'}\n\n[Structured Canonical Messages Payload]\n${JSON.stringify(node.data.messages, null, 2)}`
+      );
+      break;
+    }
+
+    case NODE_TYPES.TOOL_CONFIG: {
+      const resolved = resolveToolConfig(node.data);
+      outputValue = {
+        nodeId: node.id,
+        enabledBuiltInTools: resolved.enabledBuiltInTools,
+        enabledMcpTools: resolved.enabledMcpTools,
+        requireToolCall: resolved.requireToolCall
+      };
+      addLog(
+        state.lang === 'en' ? `Tool Config [${node.title}] updated environment` : `ツール設定 [${node.title}] 環境設定を同期完了`,
+        'info',
+        `[Tool Config Node]\nID: ${node.id}\nTitle: ${node.title}\nBuilt-in Tools: ${resolved.enabledBuiltInTools.join(', ')}\nMCP Tools: ${resolved.enabledMcpTools.join(', ')}\nForce Tool Call: ${resolved.requireToolCall}`
       );
       break;
     }
@@ -416,12 +466,21 @@ export async function evaluateNode(node) {
         canonicalMessagesPayload = baseMessages;
       }
 
-      // Automatically enable tools if tool-call-out port is connected to downstream node(s)
+      // Check if tools-in port is connected to a Tool Config node
+      const toolConfigIn = getPortInputValue(node.id, 'tools-in');
+      let toolConfigOverrides = node.data;
+
+      if (toolConfigIn && typeof toolConfigIn === 'object') {
+        toolConfigOverrides = { ...toolConfigIn, ...node.data };
+      }
+
+      // Automatically enable tools if tool-call-out port is connected or tools-in is provided
       const isToolPortConnected = state.links.some(l => l.fromNode === node.id && l.fromPort === 'tool-call-out');
 
       const llmOptions = {
-        enableTools: isToolPortConnected,
-        tools: node.data.tools || null,
+        enableTools: isToolPortConnected || Boolean(toolConfigIn) || Boolean(node.data.enableTools),
+        tools: getAllAvailableToolsForOpenAi(toolConfigOverrides),
+        requireToolCall: toolConfigOverrides.requireToolCall !== undefined ? toolConfigOverrides.requireToolCall : node.data.requireToolCall,
         returnStructured: true,
         providerOverride: effectiveProvider,
         modelOverride: effectiveModel,
@@ -467,6 +526,16 @@ export async function evaluateNode(node) {
           if (!Array.isArray(targetSessionNode.data.messages)) {
             targetSessionNode.data.messages = [];
           }
+          if (promptInput && promptInput.trim()) {
+            const lastUserMsg = targetSessionNode.data.messages[targetSessionNode.data.messages.length - 1];
+            if (!lastUserMsg || lastUserMsg.role !== 'user' || lastUserMsg.content !== promptInput.trim()) {
+              targetSessionNode.data.messages.push({
+                role: 'user',
+                content: promptInput.trim(),
+                timestamp: new Date().toISOString()
+              });
+            }
+          }
           const lastMsg = targetSessionNode.data.messages[targetSessionNode.data.messages.length - 1];
           if (!lastMsg || lastMsg.role !== 'assistant' || lastMsg.content !== outputValue) {
             targetSessionNode.data.messages.push({
@@ -475,6 +544,7 @@ export async function evaluateNode(node) {
               timestamp: new Date().toISOString()
             });
           }
+          state.emit('nodeDataChanged', { id: targetSessionNode.id, key: 'messages', value: targetSessionNode.data.messages, node: targetSessionNode });
         }
 
         addLog(
@@ -502,7 +572,7 @@ export async function evaluateNode(node) {
       const pattern = node.data.extractorPattern || '';
 
       if (targetType === 'code_block') {
-        const match = textIn.match(/```(?:\w+)?\n([\s\S]*?)```/);
+        const match = textIn.match(/```(?:\w+)?[\r\n]+([\s\S]*?)```/);
         outputValue = match ? match[1].trim() : textIn;
       } else if (targetType === 'json') {
         try {
@@ -635,7 +705,7 @@ export async function evaluateNode(node) {
           node.data.streamLogs.push({ role, text: msg.content, timestamp: new Date().toISOString() });
         }
         outputValue = messagesIn[messagesIn.length - 1]?.content || '';
-        import('./canvas.js').then(m => m.updateStreamViewContent(node));
+        import('./canvas.js?v=4').then(m => m.updateStreamViewContent(node));
       } else if (textIn) {
         let displayText = textIn;
         let displayRole = roleIn;
@@ -663,7 +733,7 @@ export async function evaluateNode(node) {
         outputValue = displayText;
         
         // Update stream timeline view cleanly without re-creating DOM element
-        import('./canvas.js').then(m => m.updateStreamViewContent(node));
+        import('./canvas.js?v=4').then(m => m.updateStreamViewContent(node));
       }
       break;
     }
@@ -672,7 +742,7 @@ export async function evaluateNode(node) {
       const resultIn = getPortInputValue(node.id, 'text-in') || '';
       outputValue = resultIn;
       node.data.lastOutputValue = resultIn;
-      import('./canvas.js').then(m => m.updateOutputNodeContent(node));
+      import('./canvas.js?v=4').then(m => m.updateOutputNodeContent(node));
       break;
     }
   }
@@ -818,12 +888,13 @@ export async function executeLocalTool(toolType, inputVal) {
 
     try {
       let result;
+      const alertFn = typeof alert !== 'undefined' ? alert : (msg) => console.log('[Sandbox Alert]:', msg);
       try {
-        const fn = new Function('input', 'variables', `return (${jsCode});`);
-        result = fn(jsCode, state.variables);
+        const fn = new Function('input', 'variables', 'alert', `return (${jsCode});`);
+        result = fn(jsCode, state.variables, alertFn);
       } catch (exprErr) {
-        const fn = new Function('input', 'variables', jsCode);
-        result = fn(jsCode, state.variables);
+        const fn = new Function('input', 'variables', 'alert', jsCode);
+        result = fn(jsCode, state.variables, alertFn);
       }
       return result !== undefined ? String(result) : 'JS executed successfully (no return value)';
     } catch (e) {

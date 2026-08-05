@@ -21,7 +21,7 @@ import {
   initGlobalDragAndDrop, 
   createNode, 
   deselectNodes 
-} from './canvas.js';
+} from './canvas.js?v=8';
 import { 
   initRecentFiles 
 } from './state.js';

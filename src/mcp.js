@@ -187,3 +187,32 @@ export function getMcpToolsForOpenAi() {
     }
   }));
 }
+
+/**
+ * Resolve effective Tool Configuration by merging node overrides with global defaults.
+ * @param {Object} [overrides={}] Node or local tool overrides
+ * @returns {object} { enabledBuiltInTools: string[], enabledMcpTools: string[], requireToolCall: boolean }
+ */
+export function resolveToolConfig(overrides = {}) {
+  const defaultBuiltIn = ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search'];
+  
+  let enabledBuiltInTools = defaultBuiltIn;
+  if (Array.isArray(overrides.enabledBuiltInTools)) {
+    enabledBuiltInTools = overrides.enabledBuiltInTools;
+  }
+
+  let enabledMcpTools = (state.mcpTools || []).map(t => t.fullId || t.name);
+  if (Array.isArray(overrides.enabledMcpTools)) {
+    enabledMcpTools = overrides.enabledMcpTools;
+  }
+
+  const requireToolCall = overrides.requireToolCall !== undefined 
+    ? Boolean(overrides.requireToolCall) 
+    : false;
+
+  return {
+    enabledBuiltInTools,
+    enabledMcpTools,
+    requireToolCall
+  };
+}

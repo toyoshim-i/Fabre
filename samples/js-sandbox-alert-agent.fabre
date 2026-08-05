@@ -6,7 +6,7 @@
     "description": "End-to-end AI Agent workflow featuring LLM Code Generation, Function Calling Tools, Error Handling flow-error routing, and JS Sandbox execution.",
     "author": "Fabre Team",
     "createdAt": "2026-08-01T07:45:00.000Z",
-    "updatedAt": "2026-08-01T08:18:00.000Z"
+    "updatedAt": "2026-08-03T12:00:00.000Z"
   },
   "nodes": [
     {
@@ -53,9 +53,9 @@
       "type": "stream_view",
       "title": "LLM Error Handler",
       "x": 730,
-      "y": 390,
-      "width": 280,
-      "height": 180,
+      "y": 500,
+      "width": 320,
+      "height": 260,
       "data": {}
     },
     {
@@ -106,8 +106,8 @@
     { "id": "link_d3", "fromNode": "node_prompt_1", "fromPort": "prompt-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
     { "id": "link_d4", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_extractor_1", "toPort": "text-in", "type": "data" },
     { "id": "link_derr", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_error_stream", "toPort": "text-in", "type": "data" },
-    { "id": "link_d5", "fromNode": "node_extractor_1", "fromPort": "extracted-out", "toNode": "node_tool_1", "toPort": "data-in", "type": "data" },
-    { "id": "link_d6", "fromNode": "node_tool_1", "fromPort": "data-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" }
+    { "id": "link_d5", "fromNode": "node_extractor_1", "fromPort": "extracted-out", "toNode": "node_tool_1", "toPort": "input-in", "type": "data" },
+    { "id": "link_d6", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" }
   ],
   "variables": {}
 }

@@ -3,69 +3,81 @@
   "version": "0.1.0",
   "meta": {
     "title": "End-to-End Infinite Chat",
-    "description": "Event-driven interactive chat workflow using Event Wait, Session Manager, LLM Call, and Stream View timeline.",
+    "description": "Infinite multi-turn conversational agent equipped with Session Manager memory, Tool Config environment, and Stream View timeline.",
     "author": "Fabre Team",
     "createdAt": "2026-08-02T12:00:00.000Z",
-    "updatedAt": "2026-08-02T12:00:00.000Z"
+    "updatedAt": "2026-08-03T13:42:00.000Z"
   },
   "nodes": [
     {
       "id": "node_event_wait_1",
       "type": "event_wait",
       "title": "User Input Event",
-      "x": 60,
+      "x": 40,
       "y": 160,
       "width": 260,
-      "height": 160,
       "data": {
-        "lastEventValue": "What is WebAssembly?"
+        "lastEventValue": "What is WebAssembly and how does it work?"
+      }
+    },
+    {
+      "id": "node_llm_1",
+      "type": "llm",
+      "title": "LLM Call (Chat Agent)",
+      "x": 380,
+      "y": 160,
+      "width": 280,
+      "data": {
+        "systemPrompt": "You are Fabre Agent, a helpful, intelligent AI assistant.",
+        "temperature": 0.7,
+        "enableTools": true
       }
     },
     {
       "id": "node_session_1",
       "type": "session",
       "title": "Session Manager",
-      "x": 370,
-      "y": 160,
-      "width": 300,
-      "height": 200,
+      "x": 380,
+      "y": 440,
+      "width": 280,
       "data": {
-        "systemPrompt": "You are Fabre AI, a helpful software engineer assistant.",
+        "systemPrompt": "You are Fabre Agent, a helpful, intelligent AI assistant.",
         "maxHistoryTurns": 10,
         "messages": []
       }
     },
     {
-      "id": "node_llm_1",
-      "type": "llm",
-      "title": "LLM Call",
-      "x": 720,
-      "y": 160,
-      "width": 280,
-      "height": 170,
+      "id": "node_tool_config_1",
+      "type": "tool_config",
+      "title": "Tool Environment Config",
+      "x": 40,
+      "y": 440,
+      "width": 260,
       "data": {
-        "temperature": 0.7
+        "enabledBuiltInTools": ["js_sandbox", "read_file", "write_file", "list_files", "mock_test", "mock_search"],
+        "requireToolCall": false
       }
     },
     {
       "id": "node_stream_1",
       "type": "stream_view",
       "title": "Conversation Timeline",
-      "x": 1050,
+      "x": 720,
       "y": 160,
       "width": 280,
-      "height": 220,
       "data": {}
     }
   ],
   "links": [
-    { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_session_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f2", "fromNode": "node_session_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f4", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_d1", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_session_1", "toPort": "user-in", "type": "data" },
+    { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f2", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_d1", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
     { "id": "link_d2", "fromNode": "node_session_1", "fromPort": "session-out", "toNode": "node_llm_1", "toPort": "session-in", "type": "data" },
-    { "id": "link_d3", "fromNode": "node_session_1", "fromPort": "messages-out", "toNode": "node_stream_1", "toPort": "messages-in", "type": "data" }
+    { "id": "link_d3", "fromNode": "node_tool_config_1", "fromPort": "tools-out", "toNode": "node_llm_1", "toPort": "tools-in", "type": "data" },
+    { "id": "link_d4", "fromNode": "node_session_1", "fromPort": "messages-out", "toNode": "node_stream_1", "toPort": "messages-in", "type": "data" },
+    { "id": "link_d5", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" },
+    { "id": "link_d6", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_session_1", "toPort": "response-in", "type": "data" }
   ],
   "variables": {}
 }

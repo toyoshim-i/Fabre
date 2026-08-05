@@ -29,9 +29,9 @@ import {
 } from './state.js';
 import { runLlmQuery } from './llm.js?v=3';
 import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow, runChatTurn } from './runtime.js';
-import { drawConnections } from './canvas.js';
+import { drawConnections } from './canvas.js?v=4';
 import { t, updateDomTranslations } from './i18n.js';
-import { registerMcpServer, removeMcpServer } from './mcp.js';
+import { registerMcpServer, removeMcpServer, resolveToolConfig } from './mcp.js';
 
 /**
  * Standard log message wrapper delegating to Model Mutator
@@ -761,6 +761,118 @@ function bindLlmOverrideFormEvents(node, prefix = 'prop-node-llm') {
 }
 
 /**
+ * Render shared Tool Config Form fields (enabled built-in tools, MCP tools, force tool call, and copy app defaults button)
+ */
+export function renderToolConfigFormFields(data = {}, prefix = 'prop-tool-config') {
+  const isEn = state.lang === 'en';
+  const resolved = resolveToolConfig(data);
+
+  const builtInList = [
+    { id: 'js_sandbox', name: 'JS Sandbox Exec (js_sandbox)' },
+    { id: 'read_file', name: 'Read File (read_file)' },
+    { id: 'write_file', name: 'Write File (write_file)' },
+    { id: 'list_files', name: 'List Files (list_files)' },
+    { id: 'mock_test', name: 'Mock Unit Test (mock_test)' },
+    { id: 'mock_search', name: 'Mock Web Search (mock_search)' }
+  ];
+
+  let builtInCheckboxes = builtInList.map(item => {
+    const isChecked = resolved.enabledBuiltInTools.includes(item.id);
+    return `
+      <label style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px; cursor:pointer;">
+        <input type="checkbox" class="${prefix}-builtin-cb" data-tool-id="${item.id}" ${isChecked ? 'checked' : ''}>
+        <span>${item.name}</span>
+      </label>
+    `;
+  }).join('');
+
+  let mcpCheckboxes = '';
+  const allMcp = state.mcpTools || [];
+  if (allMcp.length === 0) {
+    mcpCheckboxes = `<div style="font-size:10px; color:var(--text-muted); font-style:italic;">${isEn ? 'No external MCP servers connected.' : '接続済みのMCPサーバーはありません。'}</div>`;
+  } else {
+    mcpCheckboxes = allMcp.map(item => {
+      const toolId = item.fullId || item.name;
+      const isChecked = resolved.enabledMcpTools.includes(toolId);
+      return `
+        <label style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px; cursor:pointer;">
+          <input type="checkbox" class="${prefix}-mcp-cb" data-tool-id="${toolId}" ${isChecked ? 'checked' : ''}>
+          <span>[${item.serverName || 'MCP'}] ${item.name}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  return `
+    <div class="form-group border-top" style="margin-top:12px; padding-top:10px;">
+      <div style="display:flex; justify-space-between; align-items:center; margin-bottom:8px;">
+        <label style="font-weight:600; font-size:11px; margin-bottom:0;">🧰 ${isEn ? 'Tool Call Configuration' : 'ツール呼び出し設定'}</label>
+        <button type="button" id="${prefix}-copy-defaults-btn" class="btn btn-secondary btn-xs" style="font-size:10px;">
+          📋 ${isEn ? 'Copy App Defaults' : 'デフォルト設定を複製'}
+        </button>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="font-size:10px; color:var(--text-muted);">${isEn ? 'Enabled Built-in Tools' : '有効化するビルトインツール'}</label>
+        <div style="background:rgba(0,0,0,0.2); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color); max-height:120px; overflow-y:auto;">
+          ${builtInCheckboxes}
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="font-size:10px; color:var(--text-muted);">${isEn ? 'Enabled MCP Tools' : '有効化するMCPツール'}</label>
+        <div style="background:rgba(0,0,0,0.2); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color); max-height:120px; overflow-y:auto;">
+          ${mcpCheckboxes}
+        </div>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:6px; font-size:11px; margin-top:6px; cursor:pointer;">
+        <input type="checkbox" id="${prefix}-require-tool-call" ${resolved.requireToolCall ? 'checked' : ''}>
+        <span>${isEn ? 'Force Tool Call (tool_choice: required)' : 'ツール呼び出しを強制 (tool_choice: required)'}</span>
+      </label>
+    </div>
+  `;
+}
+
+export function bindToolConfigFormEvents(node, prefix = 'prop-tool-config') {
+  const copyDefaultsBtn = document.getElementById(`${prefix}-copy-defaults-btn`);
+  if (copyDefaultsBtn) {
+    copyDefaultsBtn.addEventListener('click', () => {
+      const defaultBuiltIn = ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search'];
+      const defaultMcp = (state.mcpTools || []).map(t => t.fullId || t.name);
+
+      updateNodeData(node.id, 'enabledBuiltInTools', defaultBuiltIn);
+      updateNodeData(node.id, 'enabledMcpTools', defaultMcp);
+      updateNodeData(node.id, 'requireToolCall', false);
+
+      addLog(state.lang === 'en' ? `Copied app default tool config to [${node.title}]` : `[${node.title}] にアプリのデフォルトツール設定を複製保存しました`, 'info');
+      showNodeProperties(node.id);
+    });
+  }
+
+  document.querySelectorAll(`.${prefix}-builtin-cb`).forEach(cb => {
+    cb.addEventListener('change', () => {
+      const selected = Array.from(document.querySelectorAll(`.${prefix}-builtin-cb:checked`)).map(el => el.getAttribute('data-tool-id'));
+      updateNodeData(node.id, 'enabledBuiltInTools', selected);
+    });
+  });
+
+  document.querySelectorAll(`.${prefix}-mcp-cb`).forEach(cb => {
+    cb.addEventListener('change', () => {
+      const selected = Array.from(document.querySelectorAll(`.${prefix}-mcp-cb:checked`)).map(el => el.getAttribute('data-tool-id'));
+      updateNodeData(node.id, 'enabledMcpTools', selected);
+    });
+  });
+
+  const requireCb = document.getElementById(`${prefix}-require-tool-call`);
+  if (requireCb) {
+    requireCb.addEventListener('change', (e) => {
+      updateNodeData(node.id, 'requireToolCall', e.target.checked);
+    });
+  }
+}
+
+/**
  * Display selected node parameters in the inspector sidebar panel
  * @param {string} nodeId Node ID
  */
@@ -818,17 +930,58 @@ export function showNodeProperties(nodeId) {
     `;
   } else if (node.type === NODE_TYPES.LLM) {
     html += renderLlmOverrideFormFields(node.data, 'prop-llm');
+    html += renderToolConfigFormFields(node.data, 'prop-llm-tools');
+  } else if (node.type === NODE_TYPES.TOOL_CONFIG) {
+    html += renderToolConfigFormFields(node.data, 'prop-tool-config');
   } else if (node.type === NODE_TYPES.SESSION) {
+    const isEn = state.lang === 'en';
+    const messages = Array.isArray(node.data.messages) ? node.data.messages : [];
+    
+    let messagesHtml = '';
+    if (messages.length === 0) {
+      messagesHtml = `<div style="font-size:10px; color:var(--text-muted); font-style:italic; padding:6px;">${isEn ? 'No conversation history stored.' : '保持されている会話履歴はありません。'}</div>`;
+    } else {
+      messages.forEach((msg, idx) => {
+        const isUser = msg.role === 'user';
+        const roleLabel = isUser ? 'User' : 'Assistant';
+        const badgeColor = isUser ? '#38bdf8' : '#a855f7';
+        const badgeBg = isUser ? 'rgba(56,189,248,0.15)' : 'rgba(139,92,246,0.15)';
+        const previewText = escapeHtml(msg.content.length > 60 ? msg.content.substring(0, 60) + '...' : msg.content);
+
+        messagesHtml += `
+          <div class="session-msg-item" style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; font-size:11px; padding:6px; border-radius:6px; background:${badgeBg}; border:1px solid rgba(255,255,255,0.06);">
+            <div style="flex:1; min-width:0; word-break:break-word;">
+              <div style="font-size:9px; font-weight:700; color:${badgeColor}; margin-bottom:2px;">#${idx + 1} ${roleLabel}</div>
+              <div style="color:var(--text-main); font-size:11px; line-height:1.3;">${previewText}</div>
+            </div>
+            <button class="btn btn-secondary btn-xs delete-session-msg-btn" data-msg-idx="${idx}" title="${isEn ? 'Delete this message' : 'この件を削除'}" style="padding:1px 5px; color:#ef4444; font-size:11px; flex-shrink:0; cursor:pointer;">&times;</button>
+          </div>
+        `;
+      });
+    }
+
     html += `
       <div class="form-group">
-        <label>${t.prop_session_system || (state.lang === 'en' ? 'System Instruction' : 'システム指示')}</label>
+        <label>${t.prop_session_system || (isEn ? 'System Instruction' : 'システム指示')}</label>
         <textarea id="prop-session-system" class="node-input-text node-textarea" placeholder="You are a helpful assistant...">${node.data.systemPrompt || ''}</textarea>
       </div>
       <div class="form-group">
-        <label>${t.prop_session_max_turns || (state.lang === 'en' ? 'Max History Turns' : '最大保持ターン数')}</label>
+        <label>${t.prop_session_max_turns || (isEn ? 'Max History Turns' : '最大保持ターン数')}</label>
         <input type="number" id="prop-session-max-turns" class="node-input-text" min="1" max="100" value="${node.data.maxHistoryTurns || 10}">
       </div>
       ${renderLlmOverrideFormFields(node.data, 'prop-session')}
+
+      <div class="form-group border-top" style="margin-top: 14px; padding-top: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label style="font-weight: 600; font-size: 11px; margin-bottom: 0;">${isEn ? 'Stored Conversation History' : '会話履歴メモリ'}</label>
+          <button id="prop-session-clear-all-btn" class="btn btn-secondary btn-xs" style="color: #ef4444; border-color: rgba(239,68,68,0.3); font-size: 10px;" ${messages.length === 0 ? 'disabled' : ''}>
+            ${isEn ? 'Clear All' : '一括削除'}
+          </button>
+        </div>
+        <div id="prop-session-messages-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
+          ${messagesHtml}
+        </div>
+      </div>
     `;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
     html += `
@@ -941,6 +1094,11 @@ function wirePropertyControls(node) {
   // LLM Call Temperature / Checkbox tools
   if (node.type === NODE_TYPES.LLM) {
     bindLlmOverrideFormEvents(node, 'prop-llm');
+    bindToolConfigFormEvents(node, 'prop-llm-tools');
+  }
+
+  if (node.type === NODE_TYPES.TOOL_CONFIG) {
+    bindToolConfigFormEvents(node, 'prop-tool-config');
   }
 
   if (node.type === NODE_TYPES.SESSION) {
@@ -960,6 +1118,31 @@ function wirePropertyControls(node) {
     }
 
     bindLlmOverrideFormEvents(node, 'prop-session');
+
+    const clearAllBtn = document.getElementById('prop-session-clear-all-btn');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => {
+        updateNodeData(node.id, 'messages', []);
+        addLog(state.lang === 'en' ? `Session history cleared for [${node.title}]` : `[${node.title}] の会話履歴を一括削除しました`, 'info');
+        showNodeProperties(node.id);
+      });
+    }
+
+    const messagesList = document.getElementById('prop-session-messages-list');
+    if (messagesList) {
+      messagesList.addEventListener('click', (e) => {
+        const deleteMsgBtn = e.target.closest('.delete-session-msg-btn');
+        if (deleteMsgBtn) {
+          const idx = parseInt(deleteMsgBtn.getAttribute('data-msg-idx'), 10);
+          if (!isNaN(idx) && Array.isArray(node.data.messages)) {
+            node.data.messages.splice(idx, 1);
+            updateNodeData(node.id, 'messages', node.data.messages);
+            addLog(state.lang === 'en' ? `Deleted message turn #${idx + 1}` : `会話履歴メッセージ #${idx + 1} を削除しました`, 'info');
+            showNodeProperties(node.id);
+          }
+        }
+      });
+    }
   }
 
   // Extractor selections

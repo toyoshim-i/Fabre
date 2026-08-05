@@ -3,6 +3,7 @@
 
 import { state, getDefaultSystemPrompt, setLlmProvider, normalizeString, normalizeNodeData } from './state.js';
 import { log, showCorsErrorModal, showAlert, applyLanguage } from './ui.js';
+import { getMcpToolsForOpenAi, resolveToolConfig } from './mcp.js';
 
 /**
  * Global helper to locate Chrome's Built-in AI interface across changing specifications
@@ -274,19 +275,17 @@ export function normalizeToCanonicalMessages(input, systemPrompt = '') {
   return messages;
 }
 
-import { getMcpToolsForOpenAi } from './mcp.js';
-
 export function getBuiltInToolsForOpenAi() {
   return [
     {
       type: 'function',
       function: {
         name: 'js_sandbox',
-        description: 'Execute custom JavaScript code in browser sandbox. Useful for computations, string formatting, or browser dialog alerts like alert("HELLO")',
+        description: 'Execute JavaScript code in browser sandbox and return the result. The return value of the last expression is automatically captured and returned as the tool result. For example, code "2 + 3" returns "5". Do NOT use console.log() to output results; instead, write the value as the final expression so it is returned directly.',
         parameters: {
           type: 'object',
           properties: {
-            code: { type: 'string', description: 'JavaScript code statement or expression to execute' }
+            code: { type: 'string', description: 'JavaScript code to execute. The value of the last expression is returned as the result. Example: "123 * 456" returns "56088".' }
           },
           required: ['code']
         }
@@ -324,10 +323,20 @@ export function getBuiltInToolsForOpenAi() {
   ];
 }
 
-export function getAllAvailableToolsForOpenAi() {
-  const mcpTools = getMcpToolsForOpenAi();
-  const builtInTools = getBuiltInToolsForOpenAi();
-  return [...builtInTools, ...mcpTools];
+export function getAllAvailableToolsForOpenAi(toolConfigOverrides = null) {
+  const resolved = resolveToolConfig(toolConfigOverrides || {});
+  
+  const allBuiltIn = getBuiltInToolsForOpenAi();
+  const filteredBuiltIn = allBuiltIn.filter(t => resolved.enabledBuiltInTools.includes(t.function.name));
+
+  const allMcp = getMcpToolsForOpenAi();
+  const filteredMcp = allMcp.filter((t, idx) => {
+    const rawMcp = state.mcpTools[idx];
+    const fullId = rawMcp ? (rawMcp.fullId || rawMcp.name) : t.function.name;
+    return resolved.enabledMcpTools.includes(fullId) || resolved.enabledMcpTools.includes(t.function.name);
+  });
+
+  return [...filteredBuiltIn, ...filteredMcp];
 }
 
 /**
@@ -344,6 +353,22 @@ function generateSmartMockLlmResponse(systemPrompt, userPrompt, options) {
   const sysStr = String(systemPrompt || '');
   
   if (options && options.enableTools) {
+    // Native Tool Calling sample: return expression-based code (not console.log)
+    if (sysStr.includes('Tool-Calling') || promptStr.includes('Compute')) {
+      return {
+        type: 'tool_calls',
+        content: '',
+        tool_calls: [
+          {
+            id: 'call_mock_001',
+            function: {
+              name: 'js_sandbox',
+              arguments: JSON.stringify({ code: '123 * 456' })
+            }
+          }
+        ]
+      };
+    }
     if (promptStr.includes('alert') || sysStr.includes('automation assistant')) {
       return {
         type: 'tool_calls',

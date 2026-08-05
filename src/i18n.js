@@ -23,6 +23,8 @@ export const DICTIONARY = {
   node_prompt: { en: 'Prompt Builder', ja: 'プロンプト作成' },
   node_llm: { en: 'LLM Call', ja: 'LLM実行' },
   node_session: { en: 'Session Manager', ja: '対話セッション管理' },
+  node_tool_config: { en: 'Tool Config', ja: 'ツール呼び出し設定' },
+  btn_copy_defaults: { en: 'Copy App Defaults', ja: 'デフォルト設定を複製' },
   node_extractor: { en: 'Extractor', ja: '情報抽出' },
   node_condition: { en: 'Condition', ja: '条件分岐' },
   node_set_var: { en: 'Set Var', ja: '変数代入' },
@@ -32,6 +34,8 @@ export const DICTIONARY = {
   btn_send_event: { en: 'Send Event', ja: 'イベント送信' },
   event_wait_placeholder: { en: 'Type event payload...', ja: 'イベントデータ・入力テキスト...' },
   stream_empty_placeholder: { en: 'Stream timeline output will appear here...', ja: '出力ストリームがここに表示されます...' },
+  node_session_history: { en: 'History Memory', ja: '会話履歴メモリ' },
+  btn_clear_session: { en: 'Clear History', ja: '履歴クリア' },
 
   // Sidebar Tabs
   tab_runner: { en: 'Runner', ja: '実行制御' },

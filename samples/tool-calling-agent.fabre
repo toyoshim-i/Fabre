@@ -1,0 +1,111 @@
+{
+  "format": "fabre-workflow",
+  "version": "0.1.0",
+  "meta": {
+    "title": "Tool Calling Agent",
+    "description": "Native OpenAI Function Calling workflow: LLM emits tool_calls via tool-call-out port -> Tool Node executes -> Session Manager records result -> 2nd LLM summarizes.",
+    "author": "Fabre Team",
+    "createdAt": "2026-08-03T12:00:00.000Z",
+    "updatedAt": "2026-08-03T13:50:00.000Z"
+  },
+  "nodes": [
+    {
+      "id": "node_event_wait_1",
+      "type": "event_wait",
+      "title": "User Request Event",
+      "x": 40,
+      "y": 160,
+      "width": 250,
+      "data": {
+        "lastEventValue": "Compute 123 * 456"
+      }
+    },
+    {
+      "id": "node_llm_1",
+      "type": "llm",
+      "title": "LLM Call 1 (Tool Decision)",
+      "x": 350,
+      "y": 160,
+      "width": 280,
+      "data": {
+        "systemPrompt": "You are a Tool-Calling AI Agent. Execute tools for user queries.",
+        "temperature": 0.2,
+        "enableTools": true
+      }
+    },
+    {
+      "id": "node_tool_config_1",
+      "type": "tool_config",
+      "title": "Tool Environment Config",
+      "x": 40,
+      "y": 440,
+      "width": 250,
+      "data": {
+        "enabledBuiltInTools": ["js_sandbox", "read_file", "write_file", "list_files", "mock_test", "mock_search"],
+        "requireToolCall": true
+      }
+    },
+    {
+      "id": "node_tool_1",
+      "type": "tool",
+      "title": "Tool Exec (Native)",
+      "x": 680,
+      "y": 160,
+      "width": 260,
+      "data": {
+        "toolType": "js_sandbox"
+      }
+    },
+    {
+      "id": "node_session_1",
+      "type": "session",
+      "title": "Session Manager",
+      "x": 680,
+      "y": 440,
+      "width": 260,
+      "data": {
+        "systemPrompt": "You are Fabre Agent. Read tool execution results from history and provide clear natural language answers.",
+        "maxHistoryTurns": 10,
+        "messages": []
+      }
+    },
+    {
+      "id": "node_llm_2",
+      "type": "llm",
+      "title": "LLM Call 2 (Summarizer)",
+      "x": 990,
+      "y": 160,
+      "width": 280,
+      "data": {
+        "systemPrompt": "Read the tool result in the conversation history and report the final answer to the user in friendly natural language.",
+        "temperature": 0.3
+      }
+    },
+    {
+      "id": "node_stream_1",
+      "type": "stream_view",
+      "title": "Execution Timeline",
+      "x": 990,
+      "y": 440,
+      "width": 280,
+      "data": {}
+    }
+  ],
+  "links": [
+    { "id": "link_f1", "fromNode": "node_event_wait_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f2", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_tool_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_tool_1", "fromPort": "flow-out", "toNode": "node_session_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f4", "fromNode": "node_session_1", "fromPort": "flow-out", "toNode": "node_llm_2", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f5", "fromNode": "node_llm_2", "fromPort": "flow-success", "toNode": "node_stream_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f6", "fromNode": "node_stream_1", "fromPort": "flow-out", "toNode": "node_event_wait_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_d1", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
+    { "id": "link_d2", "fromNode": "node_event_wait_1", "fromPort": "data-out", "toNode": "node_session_1", "toPort": "user-in", "type": "data" },
+    { "id": "link_d3", "fromNode": "node_tool_config_1", "fromPort": "tools-out", "toNode": "node_llm_1", "toPort": "tools-in", "type": "data" },
+    { "id": "link_d4", "fromNode": "node_llm_1", "fromPort": "tool-call-out", "toNode": "node_tool_1", "toPort": "input-in", "type": "data" },
+    { "id": "link_d5", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_session_1", "toPort": "tool-result-in", "type": "data" },
+    { "id": "link_d6", "fromNode": "node_session_1", "fromPort": "session-out", "toNode": "node_llm_2", "toPort": "session-in", "type": "data" },
+    { "id": "link_d7", "fromNode": "node_session_1", "fromPort": "messages-out", "toNode": "node_stream_1", "toPort": "messages-in", "type": "data" },
+    { "id": "link_d8", "fromNode": "node_llm_2", "fromPort": "response-out", "toNode": "node_stream_1", "toPort": "text-in", "type": "data" }
+  ],
+  "variables": {}
+}

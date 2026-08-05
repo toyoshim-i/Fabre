@@ -21,6 +21,20 @@ import {
 } from './state.js';
 import { log, showNodeProperties, openPromptEditor } from './ui.js';
 import { triggerNodeEvent } from './runtime.js';
+import { resolveToolConfig } from './mcp.js';
+
+let highestZIndex = 10;
+
+/**
+ * Bring a node to the front (highest z-index and top DOM stacking)
+ */
+export function bringNodeToFront(nodeId) {
+  if (typeof document === 'undefined') return;
+  const card = document.getElementById(nodeId);
+  if (!card) return;
+  highestZIndex += 1;
+  card.style.zIndex = String(highestZIndex);
+}
 
 export function updateCanvasTransform() {
   const canvas = document.getElementById('node-canvas');
@@ -140,6 +154,10 @@ export function initCanvasListeners() {
   
   state.on('nodeResized', ({ id, width, height }) => {
     const card = document.getElementById(id);
+    const node = state.nodes.find(n => n.id === id);
+    if (node) {
+      node.isResizedByUser = true;
+    }
     if (card) {
       card.style.width = `${width}px`;
       card.style.height = `${height}px`;
@@ -177,6 +195,9 @@ export function initCanvasListeners() {
     } else if (node.type === NODE_TYPES.TOOL && key === 'toolType') {
       const cardToolDiv = card.querySelector('.node-body div div');
       if (cardToolDiv) cardToolDiv.innerText = value;
+    } else if (node.type === NODE_TYPES.SESSION) {
+      const badge = card.querySelector('.badge');
+      if (badge) badge.innerText = `${(node.data.messages || []).length} msgs`;
     } else if (node.type === NODE_TYPES.STREAM_VIEW) {
       updateStreamViewContent(node);
     } else if (node.type === NODE_TYPES.OUTPUT) {
@@ -196,6 +217,7 @@ export function initCanvasListeners() {
     document.querySelectorAll('.node-card').forEach(card => {
       if (card.id === nodeId) {
         card.classList.add('selected');
+        bringNodeToFront(nodeId);
       } else {
         card.classList.remove('selected');
       }
@@ -239,11 +261,17 @@ export function renderNode(node) {
   card.style.left = `${node.x}px`;
   card.style.top = `${node.y}px`;
   card.style.width = `${node.width || 280}px`;
-  if (node.height) {
+  if (node.isResizedByUser && node.height) {
     card.style.height = `${node.height}px`;
+  } else if (node.type === NODE_TYPES.STREAM_VIEW || node.type === NODE_TYPES.OUTPUT) {
+    card.style.height = `${node.height || 280}px`;
+  } else {
+    card.style.height = 'auto';
   }
   
   const template = PORT_TEMPLATES[node.type];
+
+  const isFlexibleHeightNode = node.type === NODE_TYPES.STREAM_VIEW || node.type === NODE_TYPES.OUTPUT;
 
   // Compose Node UI Card markup
   let html = `
@@ -254,7 +282,7 @@ export function renderNode(node) {
       </div>
       <button class="node-delete-btn" title="Delete Node">&times;</button>
     </div>
-    <div class="node-body" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
+    <div class="node-body" style="flex: 1 1 auto; display: flex; flex-direction: column; ${isFlexibleHeightNode ? 'min-height: 0;' : ''}">
   `;
 
   if (node.type === NODE_TYPES.START) {
@@ -270,8 +298,17 @@ export function renderNode(node) {
   } else if (node.type === NODE_TYPES.PROMPT) {
     const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
     html += `<div class="node-field-group"><label data-i18n="prop_prompt_tmpl">Prompt Template</label><div style="font-family: var(--font-mono); font-size:10px; color:var(--text-muted); min-height:16px;">${displayVal || '<i>Empty Template</i>'}</div></div>`;
-  } else if (node.type === NODE_TYPES.LLM) {
-    html += `<div class="node-field-group"><label data-i18n="prop_llm_temp">Temperature</label><div>${node.data.temperature !== undefined ? node.data.temperature : 0.7}</div></div>`;
+  } else if (node.type === NODE_TYPES.SESSION) {
+    const msgs = Array.isArray(node.data.messages) ? node.data.messages : [];
+    html += `
+      <div class="node-field-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+          <label data-i18n="node_session_history">History Memory</label>
+          <span class="badge" style="font-size: 9px; padding: 1px 6px; background: rgba(168,85,247,0.2); color: #c084fc; border-radius: 10px; font-weight: 600;">${msgs.length} msgs</span>
+        </div>
+        <button class="btn btn-secondary btn-xs clear-session-btn" style="width: 100%; font-size: 10px; margin-top: 4px;" data-i18n="btn_clear_session">Clear History</button>
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.SET_VAR) {
     html += `<div class="node-field-group"><label data-i18n="prop_var_name">Var Name</label><input type="text" class="node-input-text inline-edit" data-prop="variableName" value="${node.data.variableName || ''}" placeholder="e.g. current_code"></div>`;
   } else if (node.type === NODE_TYPES.EXTRACTOR) {
@@ -298,8 +335,24 @@ export function renderNode(node) {
     html += `
       <div class="node-field-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
         <label data-i18n="node_stream_view">Stream View</label>
-        <div class="stream-logs-box" style="flex: 1 1 auto; min-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
+        <div class="stream-logs-box" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
           ${streamHtml}
+        </div>
+      </div>
+    `;
+  } else if (node.type === NODE_TYPES.TOOL_CONFIG) {
+    const resolved = resolveToolConfig(node.data);
+    const builtInCount = resolved.enabledBuiltInTools.length;
+    const mcpCount = resolved.enabledMcpTools.length;
+    html += `
+      <div class="node-field-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label data-i18n="node_tool_config">Tool Config</label>
+          <span class="badge" style="font-size: 9px; padding: 1px 6px; background: rgba(245,158,11,0.2); color: #fbbf24; border-radius: 10px; font-weight: 600;">${builtInCount + mcpCount} active</span>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); padding:4px 6px; background:rgba(0,0,0,0.2); border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+          <div>Built-in: <strong style="color:var(--text-main);">${builtInCount}</strong></div>
+          <div>MCP: <strong style="color:var(--text-main);">${mcpCount}</strong></div>
         </div>
       </div>
     `;
@@ -308,7 +361,7 @@ export function renderNode(node) {
     html += `
       <div class="node-field-group" style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;">
         <label data-i18n="node_output_result">Final Output Result</label>
-        <div class="output-result-box" style="flex: 1 1 auto; min-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">
+        <div class="output-result-box" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">
           ${valDisplay}
         </div>
       </div>
@@ -375,12 +428,18 @@ export function applyLanguageToNodeCard(cardEl) {
 function setupNodeEvents(cardEl, node) {
   const header = cardEl.querySelector('.node-header');
   
+  // Bring card to front immediately on mousedown anywhere on card
+  cardEl.addEventListener('mousedown', () => {
+    bringNodeToFront(node.id);
+  });
+
   // Selection
   cardEl.addEventListener('click', (e) => {
     // Avoid double trigger if clicking delete button
     if (e.target.classList.contains('node-delete-btn')) return;
     
     selectNode(node.id);
+    bringNodeToFront(node.id);
     e.stopPropagation(); // Prevent canvas background click deselecting
   });
   
@@ -390,6 +449,7 @@ function setupNodeEvents(cardEl, node) {
     
     state.activeDraggingNodeId = node.id;
     selectNode(node.id);
+    bringNodeToFront(node.id);
     
     // Start offset calculations
     state.dragOffset = {
@@ -433,6 +493,18 @@ function setupNodeEvents(cardEl, node) {
     sendEventBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       triggerEventFromCard();
+    });
+  }
+
+  // Clear Session History Button on card
+  const clearSessionBtn = cardEl.querySelector('.clear-session-btn');
+  if (clearSessionBtn) {
+    clearSessionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      node.data.messages = [];
+      updateNodeData(node.id, 'messages', []);
+      addLog(state.lang === 'en' ? `Session history cleared for [${node.title}]` : `[${node.title}] の会話履歴を一括削除しました`, 'info');
+      showNodeProperties(node.id);
     });
   }
 
@@ -688,7 +760,6 @@ export function createNode(type, x, y) {
     x: x,
     y: y,
     width: type === NODE_TYPES.START ? 240 : (type === NODE_TYPES.PROMPT ? 300 : 280),
-    height: type === NODE_TYPES.START ? 140 : 170,
     data: {
       promptTemplate: type === NODE_TYPES.PROMPT ? 'Review the following code:\n{{file_content}}\n\nIs it secure?' : '',
       systemPrompt: type === NODE_TYPES.LLM || type === NODE_TYPES.SESSION

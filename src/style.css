@@ -649,7 +649,7 @@ body.theme-light-slate .node-delete-btn:hover {
 
 /* Node Body & Fields */
 .node-body {
-  padding: 12px;
+  padding: 10px 14px 8px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -660,6 +660,7 @@ body.theme-light-slate .node-delete-btn:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 4px;
 }
 
 .node-field-group label {
@@ -707,8 +708,9 @@ body.theme-light-slate .node-delete-btn:hover {
   position: relative;
   display: flex;
   justify-content: space-between;
-  margin-top: 6px;
-  padding: 0 8px 10px 8px;
+  margin-top: 8px;
+  padding: 8px 8px 12px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .ports-column {

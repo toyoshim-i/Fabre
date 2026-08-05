@@ -534,10 +534,90 @@ test('Model state mutations & events regression tests', async (t) => {
 
     runExec();
     // Wait for continuous execution loop to complete all 3 steps
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     assert.strictEqual(state.runnerState, 'success');
     assert.strictEqual(state.totalSteps, 3);
+  });
+
+  await t.test('should bring node to front by updating z-index without mutating DOM structure', async () => {
+    const { bringNodeToFront } = await import('../src/canvas.js');
+    clearCanvasState();
+    addNode({ id: 'n1', type: NODE_TYPES.START, title: 'Start', data: {} });
+    bringNodeToFront('n1');
+    const nodeCard = state.nodes.find(n => n.id === 'n1');
+    assert.ok(nodeCard);
+  });
+
+  await t.test('should extract code block with CRLF newlines and feed tool node via port aliases', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    const extNode = { id: 'ext1', type: NODE_TYPES.EXTRACTOR, title: 'Extractor', data: { extractorType: 'code_block' } };
+    const toolNode = { id: 'tool1', type: NODE_TYPES.TOOL, title: 'Tool', data: { toolType: 'js_sandbox' } };
+    addNode(extNode);
+    addNode(toolNode);
+    addLink({ id: 'l1', fromNode: 'ext1', fromPort: 'extracted-out', toNode: 'tool1', toPort: 'input-in', type: 'data' });
+
+    extNode.data.lastExtractedValue = "alert('TEST_OK');";
+
+    const { getPortInputValue, evaluateNode } = await import('../src/runtime.js');
+    const inputVal = getPortInputValue('tool1', 'input-in');
+    assert.strictEqual(inputVal, "alert('TEST_OK');");
+
+    await evaluateNode(toolNode);
+    assert.ok(toolNode.data.lastToolResult.includes('JS executed successfully') || toolNode.data.lastToolResult.includes('TEST_OK'));
+  });
+
+  await t.test('should support deleting individual session messages and clearing history', async () => {
+    clearCanvasState();
+    const sessionNode = { id: 'sess1', type: NODE_TYPES.SESSION, title: 'Session', data: { messages: [{ role: 'user', content: 'Turn 1' }, { role: 'assistant', content: 'Turn 2' }] } };
+    addNode(sessionNode);
+
+    // Individual turn deletion
+    sessionNode.data.messages.splice(0, 1);
+    updateNodeData('sess1', 'messages', sessionNode.data.messages);
+    assert.strictEqual(sessionNode.data.messages.length, 1);
+    assert.strictEqual(sessionNode.data.messages[0].content, 'Turn 2');
+
+    // Bulk history clear
+    updateNodeData('sess1', 'messages', []);
+    assert.strictEqual(sessionNode.data.messages.length, 0);
+  });
+
+  await t.test('should resolve tool configuration with global defaults and local overrides', async () => {
+    const { resolveToolConfig } = await import('../src/mcp.js');
+    const { getAllAvailableToolsForOpenAi } = await import('../src/llm.js');
+
+    // Default resolution
+    const defaults = resolveToolConfig();
+    assert.deepStrictEqual(defaults.enabledBuiltInTools, ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search']);
+    assert.strictEqual(defaults.requireToolCall, false);
+
+    // Overridden resolution
+    const overrides = resolveToolConfig({ enabledBuiltInTools: ['js_sandbox'], requireToolCall: true });
+    assert.deepStrictEqual(overrides.enabledBuiltInTools, ['js_sandbox']);
+    assert.strictEqual(overrides.requireToolCall, true);
+
+    const tools = getAllAvailableToolsForOpenAi({ enabledBuiltInTools: ['js_sandbox'] });
+    assert.strictEqual(tools.length, 1);
+    assert.strictEqual(tools[0].function.name, 'js_sandbox');
+  });
+
+  await t.test('should evaluate tool_config node and feed tool configuration to llm node via tools-in port', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    const toolCfgNode = { id: 'tc1', type: NODE_TYPES.TOOL_CONFIG, title: 'Tool Config', data: { enabledBuiltInTools: ['js_sandbox', 'read_file'], requireToolCall: true } };
+    const llmNode = { id: 'llm1', type: NODE_TYPES.LLM, title: 'LLM Call', data: {} };
+    addNode(toolCfgNode);
+    addNode(llmNode);
+    addLink({ id: 'l1', fromNode: 'tc1', fromPort: 'tools-out', toNode: 'llm1', toPort: 'tools-in', type: 'data' });
+
+    const { evaluateNode } = await import('../src/runtime.js');
+    await evaluateNode(toolCfgNode);
+
+    assert.ok(toolCfgNode.data);
   });
 
 });

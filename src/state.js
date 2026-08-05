@@ -316,13 +316,13 @@ export const DEFAULT_RECENT_FILES = [
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Instruction Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'Display an alert dialog with HELLO!' } },
-        { id: 'node_prompt_1', type: 'prompt', title: 'Code Generator Prompt', x: 370, y: 160, width: 310, height: 170, data: { promptTemplate: "System Instruction:\nYou are a browser automation assistant. Generate executable JavaScript code for the user request.\nUser Request: {{inputValue}}\n\nOutput ONLY a markdown JS code block like:\n```js\nalert('HELLO');\n```" } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Call (Code Gen)', x: 730, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are a professional JavaScript automation assistant.', temperature: 0.2, enableTools: true, requireToolCall: false } },
-        { id: 'node_error_stream', type: 'stream_view', title: 'LLM Error Handler', x: 730, y: 390, width: 280, height: 180, data: {} },
-        { id: 'node_extractor_1', type: 'extractor', title: 'JS Code Extractor', x: 1060, y: 160, width: 260, height: 170, data: { extractorType: 'code_block' } },
-        { id: 'node_tool_1', type: 'tool', title: 'JS Sandbox Exec', x: 1370, y: 160, width: 280, height: 170, data: { toolType: 'js_sandbox' } },
-        { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 1700, y: 160, width: 280, height: 220, data: {} }
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Instruction Event', x: 60, y: 160, width: 260, data: { lastEventValue: 'Display an alert dialog with HELLO!' } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Code Generator Prompt', x: 370, y: 160, width: 310, data: { promptTemplate: "System Instruction:\nYou are a browser automation assistant. Generate executable JavaScript code for the user request.\nUser Request: {{inputValue}}\n\nOutput ONLY a markdown JS code block like:\n```js\nalert('HELLO');\n```" } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call (Code Gen)', x: 730, y: 160, width: 280, data: { systemPrompt: 'You are a professional JavaScript automation assistant.', temperature: 0.2, enableTools: true, requireToolCall: false } },
+        { id: 'node_error_stream', type: 'stream_view', title: 'LLM Error Handler', x: 730, y: 500, width: 320, height: 260, data: {} },
+        { id: 'node_extractor_1', type: 'extractor', title: 'JS Code Extractor', x: 1060, y: 160, width: 260, data: { extractorType: 'code_block' } },
+        { id: 'node_tool_1', type: 'tool', title: 'JS Sandbox Exec', x: 1370, y: 160, width: 280, data: { toolType: 'js_sandbox' } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 1700, y: 160, width: 280, data: {} }
       ],
       links: [
         { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
@@ -337,8 +337,50 @@ export const DEFAULT_RECENT_FILES = [
         { id: 'link_d3', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
         { id: 'link_d4', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_extractor_1', toPort: 'text-in', type: 'data' },
         { id: 'link_derr', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_error_stream', toPort: 'text-in', type: 'data' },
-        { id: 'link_d5', fromNode: 'node_extractor_1', fromPort: 'extracted-out', "toNode": "node_tool_1", "toPort": "data-in", "type": "data" },
-        { id: 'link_d6', fromNode: 'node_tool_1', fromPort: 'data-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
+        { id: 'link_d5', fromNode: 'node_extractor_1', fromPort: 'extracted-out', toNode: 'node_tool_1', toPort: 'input-in', type: 'data' },
+        { id: 'link_d6', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
+      ],
+      variables: {}
+    }
+  },
+  {
+    id: 'sample_tool_calling',
+    title: 'Tool Calling Agent',
+    description: 'Native OpenAI Function Calling workflow: LLM emits tool_calls via tool-call-out port -> Tool Node executes -> Session Manager records result -> 2nd LLM summarizes.',
+    filePath: '../samples/tool-calling-agent.fabre',
+    updatedAt: new Date().toISOString(),
+    data: {
+      format: 'fabre-workflow',
+      version: '0.1.0',
+      meta: {
+        title: 'Tool Calling Agent',
+        description: 'Native OpenAI Function Calling workflow: LLM emits tool_calls via tool-call-out port -> Tool Node executes -> Session Manager records result -> 2nd LLM summarizes.',
+        author: 'Fabre Team'
+      },
+      nodes: [
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Request Event', x: 40, y: 160, width: 250, data: { lastEventValue: 'Compute 123 * 456' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call 1 (Tool Decision)', x: 350, y: 160, width: 280, data: { systemPrompt: 'You are a Tool-Calling AI Agent. Execute tools for user queries.', temperature: 0.2, enableTools: true } },
+        { id: 'node_tool_config_1', type: 'tool_config', title: 'Tool Environment Config', x: 40, y: 440, width: 250, data: { enabledBuiltInTools: ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search'], requireToolCall: true } },
+        { id: 'node_tool_1', type: 'tool', title: 'Tool Exec (Native)', x: 680, y: 160, width: 260, data: { toolType: 'js_sandbox' } },
+        { id: 'node_session_1', type: 'session', title: 'Session Manager', x: 680, y: 440, width: 260, data: { systemPrompt: 'You are Fabre Agent. Read tool execution results from history and provide clear natural language answers to the user.', maxHistoryTurns: 10, messages: [] } },
+        { id: 'node_llm_2', type: 'llm', title: 'LLM Call 2 (Summarizer)', x: 990, y: 160, width: 280, data: { systemPrompt: 'Read the tool result in the conversation history and report the final answer to the user in friendly natural language.', temperature: 0.3 } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 990, y: 440, width: 280, data: {} }
+      ],
+      links: [
+        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_session_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_session_1', fromPort: 'flow-out', toNode: 'node_llm_2', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f5', fromNode: 'node_llm_2', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f6', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_session_1', toPort: 'user-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_tool_config_1', fromPort: 'tools-out', toNode: 'node_llm_1', toPort: 'tools-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_llm_1', fromPort: 'tool-call-out', toNode: 'node_tool_1', toPort: 'input-in', type: 'data' },
+        { id: 'link_d5', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_session_1', toPort: 'tool-result-in', type: 'data' },
+        { id: 'link_d6', fromNode: 'node_session_1', fromPort: 'session-out', toNode: 'node_llm_2', toPort: 'session-in', type: 'data' },
+        { id: 'link_d7', fromNode: 'node_session_1', fromPort: 'messages-out', toNode: 'node_stream_1', toPort: 'messages-in', type: 'data' },
+        { id: 'link_d8', fromNode: 'node_llm_2', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
       ],
       variables: {}
     }
@@ -346,7 +388,7 @@ export const DEFAULT_RECENT_FILES = [
   {
     id: 'sample_chat_e2e',
     title: 'End-to-End Infinite Chat',
-    description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
+    description: 'Infinite multi-turn conversational agent equipped with Session Manager memory, Tool Config environment, and Stream View timeline.',
     filePath: '../samples/e2e-infinite-chat.fabre',
     updatedAt: new Date().toISOString(),
     data: {
@@ -354,23 +396,26 @@ export const DEFAULT_RECENT_FILES = [
       version: '0.1.0',
       meta: {
         title: 'End-to-End Infinite Chat',
-        description: 'Interactive chat application maintaining context memory across multi-turn infinite conversations.',
+        description: 'Infinite multi-turn conversational agent equipped with Session Manager memory, Tool Config environment, and Stream View timeline.',
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Input Event', x: 60, y: 160, width: 260, height: 160, data: { lastEventValue: 'What is WebAssembly?' } },
-        { id: 'node_session_1', type: 'session', title: 'Session Manager', x: 370, y: 160, width: 300, height: 200, data: { systemPrompt: 'You are Fabre AI, a helpful software engineer assistant.', maxHistoryTurns: 10, messages: [] } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 720, y: 160, width: 280, height: 170, data: { temperature: 0.7 } },
-        { id: 'node_stream_1', type: 'stream_view', title: 'Conversation Timeline', x: 1050, y: 160, width: 280, height: 220, data: {} }
+        { id: 'node_event_wait_1', type: 'event_wait', title: 'User Input Event', x: 40, y: 160, width: 260, data: { lastEventValue: 'What is WebAssembly and how does it work?' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call (Chat Agent)', x: 380, y: 160, width: 280, data: { systemPrompt: 'You are Fabre Agent, a helpful, intelligent AI assistant.', temperature: 0.7, enableTools: true } },
+        { id: 'node_session_1', type: 'session', title: 'Session Manager', x: 380, y: 440, width: 280, data: { systemPrompt: 'You are Fabre Agent, a helpful, intelligent AI assistant.', maxHistoryTurns: 10, messages: [] } },
+        { id: 'node_tool_config_1', type: 'tool_config', title: 'Tool Environment Config', x: 40, y: 440, width: 260, data: { enabledBuiltInTools: ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search'], requireToolCall: false } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Conversation Timeline', x: 720, y: 160, width: 280, data: {} }
       ],
       links: [
-        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_session_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f2', fromNode: 'node_session_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f4', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_session_1', toPort: 'user-in', type: 'data' },
+        { id: 'link_f1', fromNode: 'node_event_wait_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f2', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_stream_1', fromPort: 'flow-out', toNode: 'node_event_wait_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_event_wait_1', fromPort: 'data-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
         { id: 'link_d2', fromNode: 'node_session_1', fromPort: 'session-out', toNode: 'node_llm_1', toPort: 'session-in', type: 'data' },
-        { id: 'link_d3', fromNode: 'node_session_1', fromPort: 'messages-out', toNode: 'node_stream_1', toPort: 'messages-in', type: 'data' }
+        { id: 'link_d3', fromNode: 'node_tool_config_1', fromPort: 'tools-out', toNode: 'node_llm_1', toPort: 'tools-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_session_1', fromPort: 'messages-out', toNode: 'node_stream_1', toPort: 'messages-in', type: 'data' },
+        { id: 'link_d5', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d6', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_session_1', toPort: 'response-in', type: 'data' }
       ],
       variables: {}
     }
@@ -378,7 +423,7 @@ export const DEFAULT_RECENT_FILES = [
   {
     id: 'sample_loop',
     title: 'Self-Debugging Agent Loop',
-    description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
+    description: 'True self-healing loop that audits code, runs automated unit tests, and conditionally loops back to fix bugs until tests pass.',
     filePath: '../samples/self-fixing-loop.fabre',
     updatedAt: new Date().toISOString(),
     data: {
@@ -386,29 +431,34 @@ export const DEFAULT_RECENT_FILES = [
       version: '0.1.0',
       meta: {
         title: 'Self-Debugging Agent Loop',
-        description: 'Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.',
+        description: 'True self-healing loop that audits code, runs automated unit tests, and conditionally loops back to fix bugs until tests pass.',
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, height: 140, data: { inputValue: 'function sum(arr) { return arr.reduce((a,b)=>a+b); }' } },
-        { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, height: 170, data: { promptTemplate: 'Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case.' } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are a Senior Engineer.', temperature: 0.7, enableTools: true } },
-        { id: 'node_tool_1', type: 'tool', title: 'Tool Exec', x: 1030, y: 160, width: 260, height: 170, data: { toolType: 'mock_test' } },
-        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1340, y: 160, width: 250, height: 170, data: { variableName: 'audit_result' } },
-        { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1640, y: 160, width: 240, height: 170, data: {} }
+        { id: 'node_start_1', type: 'start', title: 'Buggy Code Input', x: 40, y: 160, width: 250, data: { inputValue: "function divide(a, b) { return a / b; } // Bug: Missing division by zero check" } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Audit & Fix Prompt Builder', x: 330, y: 160, width: 280, data: { promptTemplate: "System Instruction:\nYou are a Senior JS QA Engineer. Review and fix bugs in code:\n{{inputValue}}\n\nOutput fixed JS code in a markdown block like:\n```js\nfunction divide(a, b) { if (b === 0) throw new Error('Division by zero'); return a / b; }\n```" } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Fix Generator', x: 640, y: 160, width: 260, data: { temperature: 0.2, enableTools: true } },
+        { id: 'node_extractor_1', type: 'extractor', title: 'Extract Fixed Code', x: 930, y: 160, width: 250, data: { extractorType: 'code_block' } },
+        { id: 'node_tool_1', type: 'tool', title: 'Automated Unit Tests', x: 1220, y: 160, width: 260, data: { toolType: 'mock_test' } },
+        { id: 'node_cond_1', type: 'condition', title: 'Check Test Verdict', x: 1220, y: 440, width: 260, data: { conditionType: 'contains', conditionValue: 'PASS' } },
+        { id: 'node_output_1', type: 'output', title: 'Verified Output Node', x: 1530, y: 440, width: 240, data: {} }
       ],
       links: [
         { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
         { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f4', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_setvar_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f5', fromNode: 'node_setvar_1', fromPort: 'flow-out', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_extractor_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f4', fromNode: 'node_extractor_1', fromPort: 'flow-out', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f5', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f_true', fromNode: 'node_cond_1', fromPort: 'flow-true', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f_false', fromNode: 'node_cond_1', fromPort: 'flow-false', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
         { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
         { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
-        { id: 'link_d3', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_setvar_1', toPort: 'value-in', type: 'data' },
-        { id: 'link_d4', fromNode: 'node_setvar_1', fromPort: 'value-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
+        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_extractor_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_extractor_1', fromPort: 'value-out', toNode: 'node_tool_1', toPort: 'input-in', type: 'data' },
+        { id: 'link_d5', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_cond_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d6', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
       ],
-      variables: { audit_result: '' }
+      variables: {}
     }
   },
   {
@@ -426,10 +476,10 @@ export const DEFAULT_RECENT_FILES = [
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 180, width: 240, height: 140, data: { inputValue: 'TEST PASS' } },
-        { id: 'node_cond_1', type: 'condition', title: 'Condition Check', x: 350, y: 180, width: 270, height: 170, data: { conditionType: 'contains', conditionValue: 'PASS' } },
-        { id: 'node_out_pass', type: 'output', title: 'Output (Pass)', x: 680, y: 80, width: 240, height: 170, data: {} },
-        { id: 'node_out_fail', type: 'output', title: 'Output (Fail)', x: 680, y: 280, width: 240, height: 170, data: {} }
+        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 180, width: 240, data: { inputValue: 'TEST PASS' } },
+        { id: 'node_cond_1', type: 'condition', title: 'Condition Check', x: 350, y: 180, width: 270, data: { conditionType: 'contains', conditionValue: 'PASS' } },
+        { id: 'node_out_pass', type: 'output', title: 'Output (Pass)', x: 680, y: 80, width: 240, data: {} },
+        { id: 'node_out_fail', type: 'output', title: 'Output (Fail)', x: 680, y: 280, width: 240, data: {} }
       ],
       links: [
         { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' },
@@ -455,11 +505,11 @@ export const DEFAULT_RECENT_FILES = [
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, height: 140, data: { inputValue: 'What is WebAssembly?' } },
-        { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, height: 170, data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, height: 170, data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 } },
-        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1030, y: 160, width: 250, height: 170, data: { variableName: 'last_response' } },
-        { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1330, y: 160, width: 240, height: 170, data: {} }
+        { id: 'node_start_1', type: 'start', title: 'Start Node', x: 60, y: 160, width: 240, data: { inputValue: 'What is WebAssembly?' } },
+        { id: 'node_prompt_1', type: 'prompt', title: 'Prompt Builder', x: 350, y: 160, width: 300, data: { promptTemplate: 'Explain in simple terms:\n{{inputValue}}' } },
+        { id: 'node_llm_1', type: 'llm', title: 'LLM Call', x: 700, y: 160, width: 280, data: { systemPrompt: 'You are an educational tutor.', temperature: 0.7 } },
+        { id: 'node_setvar_1', type: 'set_var', title: 'Set Var', x: 1030, y: 160, width: 250, data: { variableName: 'last_response' } },
+        { id: 'node_output_1', type: 'output', title: 'Output Node', x: 1330, y: 160, width: 240, data: {} }
       ],
       links: [
         { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
@@ -579,6 +629,7 @@ export const NODE_TYPES = {
   PROMPT: 'prompt',
   LLM: 'llm',
   SESSION: 'session',
+  TOOL_CONFIG: 'tool_config',
   EXTRACTOR: 'extractor',
   CONDITION: 'condition',
   SET_VAR: 'set_var',
@@ -593,6 +644,7 @@ export const NODE_COLORS = {
   prompt: 'var(--color-prompt)',
   llm: 'var(--color-llm)',
   session: '#10b981',
+  tool_config: '#f59e0b',
   extractor: 'var(--color-extractor)',
   condition: 'var(--color-condition)',
   set_var: 'var(--color-setvar)',
@@ -607,6 +659,7 @@ export const NODE_ICONS = {
   prompt: '✎',
   llm: '🤖',
   session: '🧠',
+  tool_config: '🧰',
   extractor: '⚲',
   condition: '⇅',
   set_var: '⛃',
@@ -646,7 +699,8 @@ export const PORT_TEMPLATES = {
     inputs: [
       { id: 'flow-in', name: 'Exec', type: 'flow' },
       { id: 'user-in', name: 'User Text', type: 'data' },
-      { id: 'response-in', name: 'Reply Text', type: 'data' }
+      { id: 'response-in', name: 'Reply Text', type: 'data' },
+      { id: 'tool-result-in', name: 'Tool Result', type: 'data' }
     ],
     outputs: [
       { id: 'flow-out', name: 'Next', type: 'flow' },
@@ -654,11 +708,21 @@ export const PORT_TEMPLATES = {
       { id: 'messages-out', name: 'Messages', type: 'data' }
     ]
   },
+  tool_config: {
+    inputs: [
+      { id: 'flow-in', name: 'Exec', type: 'flow' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'tools-out', name: 'Tools', type: 'data' }
+    ]
+  },
   llm: {
     inputs: [
       { id: 'flow-in', name: 'Exec', type: 'flow' },
       { id: 'prompt-in', name: 'Prompt', type: 'data' },
-      { id: 'session-in', name: 'Session', type: 'data' }
+      { id: 'session-in', name: 'Session', type: 'data' },
+      { id: 'tools-in', name: 'Tools', type: 'data' }
     ],
     outputs: [
       { id: 'flow-success', name: 'Success', type: 'flow' },

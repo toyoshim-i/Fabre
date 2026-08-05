@@ -3,97 +3,104 @@
   "version": "0.1.0",
   "meta": {
     "title": "Self-Debugging Agent Loop",
-    "description": "Inspects local JavaScript code, runs automated mock tests, and feeds errors back for self-healing bug fixes.",
+    "description": "True self-healing loop that audits code, runs automated unit tests, and conditionally loops back to fix bugs until tests pass.",
     "author": "Fabre Team",
     "createdAt": "2026-07-31T12:00:00.000Z",
-    "updatedAt": "2026-07-31T12:00:00.000Z"
+    "updatedAt": "2026-08-03T13:00:00.000Z"
   },
   "nodes": [
     {
       "id": "node_start_1",
       "type": "start",
-      "title": "Start Node",
-      "x": 60,
+      "title": "Buggy Code Input",
+      "x": 40,
       "y": 160,
-      "width": 240,
-      "height": 140,
+      "width": 250,
       "data": {
-        "inputValue": "function sum(arr) { return arr.reduce((a,b)=>a+b); }"
+        "inputValue": "function divide(a, b) { return a / b; } // Bug: Missing division by zero check"
       }
     },
     {
       "id": "node_prompt_1",
       "type": "prompt",
-      "title": "Prompt Builder",
-      "x": 350,
+      "title": "Audit & Fix Prompt Builder",
+      "x": 330,
       "y": 160,
-      "width": 300,
-      "height": 170,
+      "width": 280,
       "data": {
-        "promptTemplate": "Analyze code:\n{{inputValue}}\n\nCheck for empty array edge case."
+        "promptTemplate": "System Instruction:\nYou are a Senior JS QA Engineer. Review and fix bugs in code:\n{{inputValue}}\n\nOutput fixed JS code in a markdown block like:\n```js\nfunction divide(a, b) { if (b === 0) throw new Error('Division by zero'); return a / b; }\n```"
       }
     },
     {
       "id": "node_llm_1",
       "type": "llm",
-      "title": "LLM Call",
-      "x": 700,
+      "title": "LLM Fix Generator",
+      "x": 640,
       "y": 160,
-      "width": 280,
-      "height": 170,
+      "width": 260,
       "data": {
-        "systemPrompt": "You are a Senior Engineer.",
-        "temperature": 0.7,
+        "temperature": 0.2,
         "enableTools": true
+      }
+    },
+    {
+      "id": "node_extractor_1",
+      "type": "extractor",
+      "title": "Extract Fixed Code",
+      "x": 930,
+      "y": 160,
+      "width": 250,
+      "data": {
+        "extractorType": "code_block"
       }
     },
     {
       "id": "node_tool_1",
       "type": "tool",
-      "title": "Tool Exec",
-      "x": 1030,
+      "title": "Automated Unit Tests",
+      "x": 1220,
       "y": 160,
       "width": 260,
-      "height": 170,
       "data": {
         "toolType": "mock_test"
       }
     },
     {
-      "id": "node_setvar_1",
-      "type": "set_var",
-      "title": "Set Var",
-      "x": 1340,
-      "y": 160,
-      "width": 250,
-      "height": 170,
+      "id": "node_cond_1",
+      "type": "condition",
+      "title": "Check Test Verdict",
+      "x": 1220,
+      "y": 440,
+      "width": 260,
       "data": {
-        "variableName": "audit_result"
+        "conditionType": "contains",
+        "conditionValue": "PASS"
       }
     },
     {
       "id": "node_output_1",
       "type": "output",
-      "title": "Output Node",
-      "x": 1640,
-      "y": 160,
+      "title": "Verified Output Node",
+      "x": 1530,
+      "y": 440,
       "width": 240,
-      "height": 170,
       "data": {}
     }
   ],
   "links": [
     { "id": "link_f1", "fromNode": "node_start_1", "fromPort": "flow-out", "toNode": "node_prompt_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_f2", "fromNode": "node_prompt_1", "fromPort": "flow-out", "toNode": "node_llm_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_tool_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f4", "fromNode": "node_tool_1", "fromPort": "flow-out", "toNode": "node_setvar_1", "toPort": "flow-in", "type": "flow" },
-    { "id": "link_f5", "fromNode": "node_setvar_1", "fromPort": "flow-out", "toNode": "node_output_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f3", "fromNode": "node_llm_1", "fromPort": "flow-success", "toNode": "node_extractor_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f4", "fromNode": "node_extractor_1", "fromPort": "flow-out", "toNode": "node_tool_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f5", "fromNode": "node_tool_1", "fromPort": "flow-out", "toNode": "node_cond_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f_true", "fromNode": "node_cond_1", "fromPort": "flow-true", "toNode": "node_output_1", "toPort": "flow-in", "type": "flow" },
+    { "id": "link_f_false", "fromNode": "node_cond_1", "fromPort": "flow-false", "toNode": "node_prompt_1", "toPort": "flow-in", "type": "flow" },
     { "id": "link_d1", "fromNode": "node_start_1", "fromPort": "data-out", "toNode": "node_prompt_1", "toPort": "data-in", "type": "data" },
     { "id": "link_d2", "fromNode": "node_prompt_1", "fromPort": "prompt-out", "toNode": "node_llm_1", "toPort": "prompt-in", "type": "data" },
-    { "id": "link_d3", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_setvar_1", "toPort": "value-in", "type": "data" },
-    { "id": "link_d4", "fromNode": "node_setvar_1", "fromPort": "value-out", "toNode": "node_output_1", "toPort": "text-in", "type": "data" }
+    { "id": "link_d3", "fromNode": "node_llm_1", "fromPort": "response-out", "toNode": "node_extractor_1", "toPort": "text-in", "type": "data" },
+    { "id": "link_d4", "fromNode": "node_extractor_1", "fromPort": "value-out", "toNode": "node_tool_1", "toPort": "input-in", "type": "data" },
+    { "id": "link_d5", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_cond_1", "toPort": "text-in", "type": "data" },
+    { "id": "link_d6", "fromNode": "node_tool_1", "fromPort": "output-out", "toNode": "node_output_1", "toPort": "text-in", "type": "data" }
   ],
-  "variables": {
-    "audit_result": ""
-  }
+  "variables": {}
 }
