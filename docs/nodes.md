@@ -1,5 +1,7 @@
 # Fabre Node Reference Guide
 
+[← Back to README](../README.md) | [Architecture & Implementation Plan](./plan.md)
+
 In Fabre, workflows are constructed by connecting **Flow Ports (Triangles)** for control flow execution and **Data Ports (Circles)** for value passing.
 
 - 🔺 **Flow Ports**: Dictate execution order and branching logic between nodes.
@@ -9,10 +11,18 @@ In Fabre, workflows are constructed by connecting **Flow Ports (Triangles)** for
 
 ## 📌 Node Categories
 
+- [1. Event & Flow Control](#1-event--flow-control) (`event_wait`, `start`, `condition`)
+- [2. LLM & Prompt Engineering](#2-llm--prompt-engineering) (`prompt`, `llm`, `extractor`)
+- [3. Memory & Session](#3-memory--session) (`session`, `set_var`)
+- [4. Tools & Environment](#4-tools--environment) (`tool_config`, `tool`)
+- [5. View & Output](#5-view--output) (`stream_view`, `output`)
+
+---
+
 ### 1. Event & Flow Control
 
 #### ⚡ User Event Wait (`event_wait`)
-Triggers or resumes workflow execution based on user chat input or UI events.
+Triggers or resumes workflow execution based on user chat input or UI events. Used in multi-turn agents like [End-to-End Infinite Chat](../samples/e2e-infinite-chat.fabre).
 - **Input Ports**:
   - `flow-in` (Flow): Flow input for loop resumption
 - **Output Ports**:
@@ -30,7 +40,7 @@ Entry point node for starting workflow execution.
   - **Initial Input Value**: Default text passed on workflow start.
 
 #### 🔀 Condition Branch (`condition`)
-Evaluates input text against defined rules and routes execution flow to `True` or `False`.
+Evaluates input text against defined rules and routes execution flow to `True` or `False`. Used in [Condition Branching](../samples/condition-branching.fabre) and [Self-Debugging Agent Loop](../samples/self-fixing-loop.fabre).
 - **Input Ports**:
   - `flow-in` (Flow): Flow input
   - `text-in` (Data): Input text to evaluate
@@ -78,7 +88,7 @@ Sends queries to Large Language Models (LLMs) to perform generation or Function 
   - **Provider / Model / Endpoint Overrides**: Local configuration overrides.
 
 #### ✂️ Content Extractor (`extractor`)
-Parses and extracts structured data or code snippets from LLM outputs.
+Parses and extracts structured data or code snippets from LLM outputs. Used in [JS Sandbox Browser Alert Agent](../samples/js-sandbox-alert-agent.fabre).
 - **Input Ports**:
   - `flow-in` (Flow): Flow input
   - `text-in` (Data): Raw text to parse
@@ -97,7 +107,7 @@ Parses and extracts structured data or code snippets from LLM outputs.
 ### 3. Memory & Session
 
 #### 🧠 Session Manager (`session`)
-Central authority for structured multi-turn conversation memory (`Canonical Messages`).
+Central authority for structured multi-turn conversation memory (`Canonical Messages`). Used in [Tool Calling Agent](../samples/tool-calling-agent.fabre) and [End-to-End Infinite Chat](../samples/e2e-infinite-chat.fabre).
 - **Input Ports**:
   - `flow-in` (Flow): Flow input
   - `user-in` (Data): User turn text
@@ -135,7 +145,7 @@ Aggregates built-in tools and MCP (Model Context Protocol) servers for LLM consu
   - **Duplicate Global Defaults**: Copies current environment defaults into local node configuration.
 
 #### 🛠️ Tool Execution (`tool`)
-Executes the specified local or sandbox tool with input parameters.
+Executes the specified local or sandbox tool with input parameters. Used in [Tool Calling Agent](../samples/tool-calling-agent.fabre).
 - **Input Ports**:
   - `flow-in` (Flow): Flow input
   - `input-in` (Data): Input code or argument payload (connected to LLM `tool-call-out`)

@@ -1,5 +1,7 @@
 # Fabre: Flow-based Agent Builder & Runtime Engine - Detailed Implementation Plan
 
+[← Back to README](../README.md) | [Node Reference Guide](./nodes.md)
+
 **Fabre** is a zero-dependency, pure-vanilla web application that allows users to visually design, debug, and run LLM agent workflows using a node-based interface. The name is inspired by Jean-Henri Fabre, the entomologist, as this application acts as an observation and debugging harness for autonomous agents and program "bugs".
 
 ---
