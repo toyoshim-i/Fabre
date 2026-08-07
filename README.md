@@ -1,88 +1,86 @@
-# Fabre (ファブル) - Flow-based Agent Builder & Runtime Engine
+# Fabre - Flow-based Agent Builder & Runtime Engine
 
-**Fabre** は、ブラウザ上で直感的に LLM AI エージェントのワークフローを視覚的にデザイン・実行・デバッグできる、サーバーレスのノードベース型エージェントビルド環境＆実行エンジンです。
+**Fabre** is a zero-dependency, pure-vanilla JavaScript web application for visually designing, executing, and debugging LLM AI agent workflows through a serverless, node-based canvas interface.
 
-名前の由来は昆虫学者のジャン＝アンリ・ファーブル（Jean-Henri Fabre）。自律エージェントの動態観察やプログラムの「バグ」を観察・デバッグするための実験観察キットとして命名されました。
-
----
-
-## ✨ 主な特徴 (Key Features)
-
-- 🚀 **完全フロントエンド完結 (Zero-Dependency & Pure Vanilla JS)**
-  - バックエンドサーバー不要。HTML / CSS / JavaScript のみで動作し、高いパフォーマンスとセキュアなローカル完結動作を実現。
-- 🎨 **ノードベースのワークフローエディタ**
-  - ベジェ曲線接続、キャンバスのパン・ズーム、実行中のシグナルアニメーション（データ／フローの移動）、リアルタイムデバッグログ機能。
-- 🧠 **構造化対話セッション管理 (Session Manager)**
-  - 会話履歴（`role: 'user' | 'assistant' | 'system' | 'tool'`）を構造化保持。
-  - スライディングウィンドウによる履歴上限（`maxHistoryTurns`）制御や、セッションごとの LLM モデル/エンドポイント上書きをサポート。
-- 🛠️ **ネイティブ Tool Calling & MCP (Model Context Protocol) 連携**
-  - OpenAI Function Calling 互換の `tool-call-out` ポートによる直接ツール呼び出し。
-  - JS Sandbox、ファイル操作（`read_file`, `write_file`, `list_files`）、ウェブ検索モック、および外付け MCP サーバーとの動的ツール連携環境（`Tool Config`）。
-- 🤖 **柔軟な LLM プロバイダー対応**
-  - Ollama、OpenAI 互換 REST API、Chrome Built-in AI (`window.ai` / Gemini Nano) に対応。
-- ✏️ **AI アシスト付きプロンプト最適化**
-  - Prompt ノードにて「プロンプト精錬 (Refine)」や「コメント指定修正 (Revise)」を AI が自動アシスト。
-- 📁 **ローカルファイルシステム連携 (File System Access API)**
-  - ブラウザからローカルフォルダを直接選択・接続し、ライブファイルツリー表示および読み書き操作が可能。
-- 🌐 **多言語インターフェース (i18n)**
-  - 日本語 / 英語のワンクリック切り替えに対応。
+The name is inspired by Jean-Henri Fabre, the famous entomologist, as this environment serves as an observation and debugging harness for autonomous agent behaviors and software "bugs".
 
 ---
 
-## 📦 同梱サンプルワークフロー (Sample Workflows)
+## ✨ Key Features
 
-画面上の「サンプル読み込み」または `samples/` ディレクトリから、以下の高度な AI エージェントパターンをすぐに試すことができます：
+- 🚀 **Serverless & Pure Vanilla Frontend (Zero-Dependency)**
+  - Runs entirely in the browser using HTML, CSS, and modern Vanilla JavaScript with no backend build tools or external server dependencies required.
+- 🎨 **Visual Node-Based Canvas Workflow Editor**
+  - Smooth Bezier curve wire connections, canvas panning and zooming, live execution signal animations (visualizing data and flow execution), and structured runtime debug logs.
+- 🧠 **First-Class Conversation Memory (Session Manager)**
+  - Structured canonical message history management (`role: 'user' | 'assistant' | 'system' | 'tool'`).
+  - Sliding window turn trimming (`maxHistoryTurns`) and per-session LLM model/endpoint configuration overrides.
+- 🛠️ **Native Tool Calling & MCP (Model Context Protocol) Integration**
+  - OpenAI Function Calling schema compatibility via `tool-call-out` ports.
+  - Environment node (`tool_config`) to configure built-in tools (JS Sandbox, local filesystem tools `read_file`/`write_file`/`list_files`, mock web search) and external MCP servers.
+- 🤖 **Flexible LLM Provider Support**
+  - Out-of-the-box integration with Ollama, OpenAI-compatible REST APIs, and Chrome Built-in AI (`window.ai` / Gemini Nano).
+- ✏️ **AI-Assisted Prompt Optimization**
+  - Built-in Prompt node features for automated prompt template refining ("Refine Prompt") and user-guided prompt editing ("Revise Prompt").
+- 📁 **Browser-Native File System Access API Integration**
+  - Connect local working directories directly through the browser's native File System Access API with a live sidebar file tree explorer.
+- 🌐 **Full Internationalization (i18n)**
+  - One-click language toggling between English and Japanese.
+
+---
+
+## 📦 Bundled Sample Workflows
+
+You can load and explore pre-built agent workflows via the "Load Sample Workflow" menu or from the `samples/` directory:
 
 1. **Tool Calling Agent (`tool-calling-agent.fabre`)**
-   - OpenAI Function Calling 互換の 2-Pass エージェント。`tool-call-out` ポートから直接ツール（JS Sandbox）を実行し、その結果を Session Manager に記録した上で、2回目の LLM が自然言語で回答を要約します。
+   - 2-Pass Native Function Calling workflow: LLM emits structured tool calls via `tool-call-out` -> JS Sandbox executes -> Session Manager records tool output -> 2nd LLM synthesizes natural language answer.
 2. **End-to-End Infinite Chat (`e2e-infinite-chat.fabre`)**
-   - Session Manager と Tool Config 環境を備えた無限ターン対話チャットエージェント。Stream View タイムラインにリアルタイムで会話履歴が表示されます。
+   - Multi-turn conversational agent equipped with Session Manager memory, Tool Config environment, and Stream View timeline rendering.
 3. **JS Sandbox Browser Alert Agent (`js-sandbox-alert-agent.fabre`)**
-   - プロンプト生成 ➔ コード抽出 (Extractor) ➔ JS Sandbox 実行 ➔ エラー時分岐 (flow-error) を備えた耐久型自動化エージェント。
+   - Code generation, markdown extraction, browser JS execution, and `flow-error` fallback handling.
 4. **Self-Debugging Agent Loop (`self-fixing-loop.fabre`)**
-   - コード実行エラーを条件分岐 (Condition) で検知し、エラーメッセージをプロンプトにフィードバックして自律的に修正・再実行するループ構造。
+   - Autonomous error-correction loop that detects execution errors via Condition branching and feeds error messages back into the LLM prompt.
 5. **Condition Branching & Flow (`condition-branching.fabre`)**
-   - テキストの判定結果（PASS / FAIL）に応じて動的に処理フローを切り替える基本パターン。
+   - Basic control flow branching based on text evaluation rules (`PASS` / `FAIL`).
 
 ---
 
-## 🚀 クイックスタート (Getting Started)
+## 🚀 Quick Start
 
-### 1. ローカルでの実行
+No backend installation or compilation is needed. Host the repository root with any static web server or open `index.html` directly in your browser.
 
-バックエンドビルド手順は不要です。任意の静的ファイルサーバーでルートディレクトリをホストするか、ブラウザで直接 `index.html` を開きます。
-
-**Python を使う場合:**
+**Using Python:**
 ```bash
 python3 -m http.server 8080
 ```
-ブラウザで `http://localhost:8080` にアクセスします。
+Open `http://localhost:8080` in your browser.
 
-**Node.js (npx) を使う場合:**
+**Using Node.js (npx):**
 ```bash
 npx servor . 8080
 ```
 
 ---
 
-## 🧪 テストの実行 (Testing)
+## 🧪 Testing
 
-Node.js 標準のテストランナーを使用して、モデル状態遷移、コンポーネント連携、およびサンプルワークフローの統合テストを一括実行できます。
+Run the comprehensive unit and integration test suite via the Node.js standard test runner:
 
 ```bash
 npm test
 ```
 
-すべての統合テストはモック LLM およびローカルランタイム上で検証されます。
+All 38 test suites evaluate model mutations, state hydration, node executions, and sample workflow flows against mock LLM providers.
 
 ---
 
-## 📚 ドキュメント (Documentation)
+## 📚 Documentation
 
-- [ノード詳細リファレンス (docs/nodes.md)](file:///home/toyoshim/Work/self/docs/nodes.md) - 各ノードの仕様、ポート一覧、プロパティ設定ガイド
+- [Node Reference Guide (docs/nodes.md)](file:///home/toyoshim/Work/self/docs/nodes.md) - Complete reference for all 11 node types, ports, properties, and data schemas.
 
 ---
 
-## 📄 ライセンス
+## 📄 License
 
 MIT License

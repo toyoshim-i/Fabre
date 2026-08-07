@@ -1,167 +1,167 @@
-# Fabre ノードタイプリファレンス (Node Reference Guide)
+# Fabre Node Reference Guide
 
-Fabre では、ワークフローを構築するために **フローポート (三角形)** と **データポート (丸形)** を繋ぎ合わせてノードを接続します。
+In Fabre, workflows are constructed by connecting **Flow Ports (Triangles)** for control flow execution and **Data Ports (Circles)** for value passing.
 
-- 🔺 **フローポート (Flow Ports)**: ノードの実行順序・制御の流れを決定します。
-- 🟢/🔵 **データポート (Data Ports)**: テキスト、数値、構造化オブジェクトなどのデータを渡します。
-
----
-
-## 📌 カテゴリ別ノード一覧
-
-### 1. イベント・制御フロー (Event & Flow Control)
-
-#### ⚡ ユーザー入力待機 (`event_wait`)
-ユーザーからのチャット入力やイベント発火をトリガーにしてワークフローを開始・再開するノードです。
-- **入力ポート**:
-  - `flow-in` (Flow): ループ再開用のフロー入力
-- **出力ポート**:
-  - `flow-out` (Flow): イベント受信時に発火するフロー出力
-  - `data-out` (Data): 受信したテキストデータ
-- **プロパティ**:
-  - **初期データ値**: デフォルトで保持する入力テキスト
-
-#### 🚀 開始ノード (`start`)
-ワークフローのスタート地点を定義します。
-- **出力ポート**:
-  - `flow-out` (Flow): 実行開始フロー
-  - `data-out` (Data): 初期変数またはテキスト
-- **プロパティ**:
-  - **初期テキスト値**: ワークフロー開始時に出力ポートへ渡されるテキスト
-
-#### 🔀 条件分岐 (`condition`)
-入力テキストの内容に応じて処理フローを `True` / `False` に分岐します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `text-in` (Data): 判定対象のテキスト
-- **出力ポート**:
-  - `flow-true` (Flow): 条件合致時のフロー
-  - `flow-false` (Flow): 条件不一致時のフロー
-  - `result-out` (Data): 判定結果テキスト (`"true"` または `"false"`)
-- **プロパティ**:
-  - **判定ルール**: `Contains` (含む), `Regex Match` (正規表現), `JS Expression` (JavaScript評価)
-  - **一致パターン**: 判定に使用する文字列または正規表現 (例: `PASS`)
+- 🔺 **Flow Ports**: Dictate execution order and branching logic between nodes.
+- 🟢/🔵 **Data Ports**: Pass text, numerical values, structured canonical message objects, or tool configuration payloads.
 
 ---
 
-### 2. LLM & プロンプト (LLM & Prompt)
+## 📌 Node Categories
 
-#### 📝 プロンプト構築 (`prompt`)
-変数埋め込み（`{{variable_name}}`）に対応したプロンプトテンプレートを作成します。AIによる精錬・修正機能が付属しています。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `data-in` (Data): 埋め込み用データ
-- **出力ポート**:
-  - `flow-out` (Flow): 完了フロー
-  - `prompt-out` (Data): コンパイル後のプロンプトテキスト
-- **プロパティ**:
-  - **プロンプトテンプレート**: `{{inputValue}}` などのプレースホルダーを含むテンプレート
-  - **🪄 精錬 (Refine)**: 現在のプロンプトを LLM が自動的に最適化
-  - **✏️ コメント修正 (Revise)**: 「もっと簡潔に」などの指示に基づいて LLM がテンプレートを修正
+### 1. Event & Flow Control
 
-#### 🤖 LLM 呼び出し (`llm`)
-大規模言語モデル (LLM) へリクエストを送信し、テキスト生成または Function Calling を実行します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `prompt-in` (Data): プロンプト入力
-  - `session-in` (Data, 任意): 接続された `Session Manager` オブジェクト
-  - `tools-in` (Data, 任意): 接続された `Tool Config` オブジェクト
-- **出力ポート**:
-  - `flow-success` (Flow): 生成成功時のフロー
-  - `flow-error` (Flow): エラー発生時のフロー (API失敗、CORS等)
-  - `response-out` (Data): LLMの自然言語レスポンス
-  - `tool-call-out` (Data): LLMが発行した Function Calling ペイロード (`tool_calls`)
-- **プロパティ**:
-  - **システム指示 (System Prompt)**: モデルへの役割・指示
-  - **Temperature**: 生成のランダム性 (0.0 〜 1.0)
-  - **ツール呼び出しの有効化**: Function Calling のオン/オフ
-  - **プロバイダー / モデル / エンドポイント上書き**: グローバル設定の上書き
+#### ⚡ User Event Wait (`event_wait`)
+Triggers or resumes workflow execution based on user chat input or UI events.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input for loop resumption
+- **Output Ports**:
+  - `flow-out` (Flow): Outgoing flow triggered on event arrival
+  - `data-out` (Data): Received input text
+- **Inspector Properties**:
+  - **Last Event Value**: Default or last received event string.
 
-#### ✂️ 情報抽出 (`extractor`)
-LLMの応答からコードブロックやJSON、特定文字列をパースして抽出します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `text-in` (Data): 解析対象テキスト
-- **出力ポート**:
-  - `flow-out` (Flow): 完了フロー
-  - `extracted-out` (Data): 抽出された文字列
-- **プロパティ**:
-  - **抽出タイプ**:
-    - `code_block`: マークダウンの ```js ... ``` コードブロック内を抽出
-    - `json_key`: JSONをパースし指定キーの値を取り出す
-    - `regex`: 正規表現のキャプチャグループを取り出す
-    - `delimiter`: 指定した開始・終了文字列の開示間を抽出
+#### 🚀 Workflow Start (`start`)
+Entry point node for starting workflow execution.
+- **Output Ports**:
+  - `flow-out` (Flow): Initial execution flow
+  - `data-out` (Data): Initial text value
+- **Inspector Properties**:
+  - **Initial Input Value**: Default text passed on workflow start.
+
+#### 🔀 Condition Branch (`condition`)
+Evaluates input text against defined rules and routes execution flow to `True` or `False`.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `text-in` (Data): Input text to evaluate
+- **Output Ports**:
+  - `flow-true` (Flow): Flow out when evaluation succeeds
+  - `flow-false` (Flow): Flow out when evaluation fails
+  - `result-out` (Data): Text result (`"true"` or `"false"`)
+- **Inspector Properties**:
+  - **Rule Type**: `Contains`, `Regex Match`, or `JS Expression`.
+  - **Match Value / Pattern**: String or regular expression pattern (e.g., `PASS`).
 
 ---
 
-### 3. メモリ・セッション (Memory & Session)
+### 2. LLM & Prompt Engineering
 
-#### 🧠 対話セッション管理 (`session`)
-構造化された会話履歴（`Canonical Messages`）を一括管理し、LLMノードへ自動共有します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `user-in` (Data): ユーザーの発話テキスト
-  - `tool-result-in` (Data): ツール実行結果テキスト (`role: 'tool'`)
-- **出力ポート**:
-  - `flow-out` (Flow): 完了フロー
-  - `session-out` (Data): セッションコンテキストオブジェクト (LLMの `session-in` へ接続)
-  - `messages-out` (Data): 構造化メッセージ配列 (Stream View の `messages-in` へ接続)
-- **プロパティ**:
-  - **最大保持ターン数 (`maxHistoryTurns`)**: 履歴の上限（過去の古い発話を自動削除）
-  - **モデル名 / エンドポイント名の上書き**: このセッションが使用する固有の LLM 設定
+#### 📝 Prompt Builder (`prompt`)
+Constructs prompt templates supporting template variable interpolation (`{{variable_name}}`).
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `data-in` (Data): Data input for variable substitution
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output on completion
+  - `prompt-out` (Data): Compiled prompt text
+- **Inspector Properties**:
+  - **Prompt Template**: Template string containing placeholders like `{{inputValue}}`.
+  - **🪄 Refine Prompt**: Uses LLM to automatically optimize the prompt template.
+  - **✏️ Revise Prompt with Comment**: Rewrites the template based on specific instructions (e.g., "Make it concise").
 
-#### 💾 変数設定 (`set_var`)
-ワークフロー全体のグローバル変数領域へ値を書き込み・保持します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `value-in` (Data): 保存する値
-- **出力ポート**:
-  - `flow-out` (Flow): 完了フロー
-  - `value-out` (Data): 保持している変数データ
-- **プロパティ**:
-  - **変数名**: 保存先の変数識別子 (例: `user_name`)
+#### 🤖 LLM Call (`llm`)
+Sends queries to Large Language Models (LLMs) to perform generation or Function Calling.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `prompt-in` (Data): Input prompt text
+  - `session-in` (Data, Optional): Connected `Session Manager` object
+  - `tools-in` (Data, Optional): Connected `Tool Config` object
+- **Output Ports**:
+  - `flow-success` (Flow): Flow triggered on successful response
+  - `flow-error` (Flow): Flow triggered on error (API failure, CORS, network timeout)
+  - `response-out` (Data): Natural language response text
+  - `tool-call-out` (Data): Emitted Function Calling payload (`tool_calls`)
+- **Inspector Properties**:
+  - **System Instruction**: System prompt defining the AI persona/role.
+  - **Temperature**: Randomness slider (0.0 to 1.0).
+  - **Enable Tools**: Toggle native tool calling / function calling.
+  - **Provider / Model / Endpoint Overrides**: Local configuration overrides.
 
----
-
-### 4. ツール & 環境 (Tools & Environment)
-
-#### ⚙️ ツール環境設定 (`tool_config`)
-LLMノードで利用可能なビルトインツールおよび MCP サーバーの設定を集約し、LLMに供給します。
-- **出力ポート**:
-  - `tools-out` (Data): 統合されたツールスキーマ設定 (LLMの `tools-in` へ接続)
-- **プロパティ**:
-  - **有効化ビルトインツール**: `js_sandbox`, `read_file`, `write_file`, `list_files`, `mock_search` などの個別トグル
-  - **ツール呼び出しの強制 (`requireToolCall`)**: LLMに必ずツールを呼び出させる設定
-  - **デフォルト設定の複製**: グローバル環境のデフォルトツール設定をノードにコピー
-
-#### 🛠️ ツール実行 (`tool`)
-指定されたツール (JS Sandbox、ファイル読み書き、モックツール) を実際に実行します。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `input-in` (Data): ツールに入力するコードまたは引数 (`tool-call-out` ポートと接続)
-- **出力ポート**:
-  - `flow-out` (Flow): 実行完了フロー
-  - `output-out` (Data): ツールの実行結果テキスト (Session Manager の `tool-result-in` へ接続)
-- **プロパティ**:
-  - **ツール種別**: `js_sandbox` (JavaScript実行), `read_file`, `write_file`, `list_files`, `mock_search` 等
+#### ✂️ Content Extractor (`extractor`)
+Parses and extracts structured data or code snippets from LLM outputs.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `text-in` (Data): Raw text to parse
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output on completion
+  - `extracted-out` (Data): Extracted target text
+- **Inspector Properties**:
+  - **Extractor Type**:
+    - `code_block`: Extracts code within markdown blocks (e.g., ```js ... ```).
+    - `json_key`: Parses JSON string and retrieves value for a specific key.
+    - `regex`: Extracts regex capture group matches.
+    - `delimiter`: Extracts text between specified start and end delimiter strings.
 
 ---
 
-### 5. 表示・出力 (View & Output)
+### 3. Memory & Session
 
-#### 📜 タイムライン表示 (`stream_view`)
-リアルタイムのチャット会話ログやストリーミングテキストを表示するUIカードノードです。
-- **入力ポート**:
-  - `flow-in` (Flow): 実行フロー
-  - `text-in` (Data): 追加表示するテキスト
-  - `messages-in` (Data): Session Manager から受け取る構造化メッセージ配列
-- **出力ポート**:
-  - `flow-out` (Flow): 次のノードへのフロー
+#### 🧠 Session Manager (`session`)
+Central authority for structured multi-turn conversation memory (`Canonical Messages`).
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `user-in` (Data): User turn text
+  - `tool-result-in` (Data): Tool execution output (`role: 'tool'`)
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output on completion
+  - `session-out` (Data): Session context object (connected to LLM `session-in`)
+  - `messages-out` (Data): Array of structured messages (connected to Stream View `messages-in`)
+- **Inspector Properties**:
+  - **Max History Turns**: Sliding window turn count limit.
+  - **Model / Endpoint Overrides**: Per-session LLM backend configurations.
 
-#### 🎯 最終結果出力 (`output`)
-ワークフローの最終到達点として結果をカード上に表示します。
-- **入力ポート**:
-  - `flow-in` (Flow): 完了フロー
-  - `data-in` (Data): 出力テキストデータ
-- **プロパティ**:
-  - **ラベル名**: カードヘッダーに表示するタイトル
+#### 💾 Set Variable (`set_var`)
+Stores and persists data values into global workflow state variables.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `value-in` (Data): Value to store
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output on completion
+  - `value-out` (Data): Stored variable value
+- **Inspector Properties**:
+  - **Variable Name**: Global state variable key (e.g., `extracted_code`).
+
+---
+
+### 4. Tools & Environment
+
+#### ⚙️ Tool Environment Config (`tool_config`)
+Aggregates built-in tools and MCP (Model Context Protocol) servers for LLM consumption.
+- **Output Ports**:
+  - `tools-out` (Data): Consolidated tool schema payload (connected to LLM `tools-in`)
+- **Inspector Properties**:
+  - **Enabled Built-In Tools**: Toggles for `js_sandbox`, `read_file`, `write_file`, `list_files`, `mock_search`, etc.
+  - **Require Tool Call**: Forces the LLM to select a tool.
+  - **Duplicate Global Defaults**: Copies current environment defaults into local node configuration.
+
+#### 🛠️ Tool Execution (`tool`)
+Executes the specified local or sandbox tool with input parameters.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `input-in` (Data): Input code or argument payload (connected to LLM `tool-call-out`)
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output on completion
+  - `output-out` (Data): Execution result string (connected to Session Manager `tool-result-in`)
+- **Inspector Properties**:
+  - **Tool Type**: Selects tool executor (`js_sandbox`, `read_file`, `write_file`, `list_files`, `mock_search`, etc.).
+
+---
+
+### 5. View & Output
+
+#### 📜 Stream View (`stream_view`)
+Renders real-time multi-turn conversation timelines and streamed execution logs.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `text-in` (Data): Stream text to append
+  - `messages-in` (Data): Structured canonical message array from Session Manager
+- **Output Ports**:
+  - `flow-out` (Flow): Flow output to next node
+
+#### 🎯 Output (`output`)
+Terminal node displaying final workflow outputs on a canvas card.
+- **Input Ports**:
+  - `flow-in` (Flow): Flow input
+  - `data-in` (Data): Text output data
+- **Inspector Properties**:
+  - **Label**: Title displayed on the output card header.
