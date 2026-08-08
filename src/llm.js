@@ -81,46 +81,41 @@ export async function checkChromeAi() {
       
       const isAvailable = (available === 'available' || available === 'readily' || available === 'after-download' || available === 'downloadable' || available === 'downloading' || available === true);
 
-      const downloadBtn = document.getElementById('download-chrome-ai-btn');
-
       if (!isAvailable) {
         state.chromeAiAvailable = false;
+        state.chromeAiPendingDownload = false;
         desc.innerText = t('chrome_ai_status_unavailable', { status: available });
         statusBlock.className = 'info-block warning';
         badgeContainer.className = 'status-badge warning';
         badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
         badge.removeAttribute('data-i18n');
-        if (downloadBtn) downloadBtn.style.display = 'none';
         log(t('chrome_ai_status_unavailable', { status: available }), 'warning');
       } else {
         const needsDownload = (available === 'after-download' || available === 'downloadable' || available === 'downloading');
         
         if (needsDownload) {
+          state.chromeAiAvailable = false;
+          state.chromeAiPendingDownload = true;
           desc.innerText = t('chrome_ai_status_downloading', { status: available });
           statusBlock.className = 'info-block warning';
           badgeContainer.className = 'status-badge warning';
-          badge.innerText = state.lang === 'en' ? 'LLM: Downloadable' : 'LLM: 要DL';
+          badge.innerText = state.lang === 'en' ? 'LLM: Pending DL' : 'LLM: DL待機中';
           log(t('chrome_ai_status_downloading', { status: available }), 'info');
-
-          // Require explicit User Gesture to start download
-          if (downloadBtn) {
-            downloadBtn.style.display = 'inline-flex';
-          }
         } else {
           state.chromeAiAvailable = true;
+          state.chromeAiPendingDownload = false;
           state.chromeAiCapabilities = capabilities;
           desc.innerText = t('chrome_ai_status_active');
           statusBlock.className = 'info-block success';
           badgeContainer.className = 'status-badge success';
           badge.innerText = 'LLM: Chrome AI';
           badge.removeAttribute('data-i18n');
-          if (downloadBtn) downloadBtn.style.display = 'none';
           log(t('chrome_ai_status_active'), 'success');
         }
       }
-
     } catch (err) {
       state.chromeAiAvailable = false;
+      state.chromeAiPendingDownload = false;
       desc.innerText = `${t('chrome_ai_status_unavailable', { status: 'error' })} (${err.message})`;
       statusBlock.className = 'info-block warning';
       badgeContainer.className = 'status-badge warning';
@@ -130,6 +125,7 @@ export async function checkChromeAi() {
     }
   } else {
     state.chromeAiAvailable = false;
+    state.chromeAiPendingDownload = false;
     desc.innerText = t('chrome_ai_status_unsupported');
     statusBlock.className = 'info-block warning';
     badgeContainer.className = 'status-badge warning';
@@ -138,6 +134,16 @@ export async function checkChromeAi() {
     log(t('chrome_ai_status_unsupported'), 'warning');
   }
 
+}
+
+/**
+ * Consume user gesture and initiate background Chrome AI model download if queued
+ */
+export function consumeChromeAiUserGesture() {
+  if (state.chromeAiPendingDownload) {
+    state.chromeAiPendingDownload = false;
+    startChromeAiModelDownload();
+  }
 }
 
 export async function startChromeAiModelDownload() {

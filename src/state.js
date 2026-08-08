@@ -79,6 +79,7 @@ export const state = {
   apiModel: 'qwen2.5-coder:7b',
   apiKey: '',
   chromeAiAvailable: false,
+  chromeAiPendingDownload: false,
   chromeAiCapabilities: null,
   useMockLlm: false,
   mockLlmHandler: null,
