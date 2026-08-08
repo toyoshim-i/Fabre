@@ -89,7 +89,6 @@ export async function checkChromeAi() {
         badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
         badge.removeAttribute('data-i18n');
         log(t('chrome_ai_status_unavailable', { status: available }), 'warning');
-        updateLlmProvider('openai-compatible');
       } else {
         const needsDownload = (available === 'after-download' || available === 'downloadable' || available === 'downloading');
         
@@ -121,7 +120,6 @@ export async function checkChromeAi() {
       badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
       badge.removeAttribute('data-i18n');
       log(`Failed to initialize Chrome AI: ${err.message}`, 'error');
-      updateLlmProvider('openai-compatible');
     }
   } else {
     state.chromeAiAvailable = false;
@@ -131,8 +129,8 @@ export async function checkChromeAi() {
     badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
     badge.removeAttribute('data-i18n');
     log(t('chrome_ai_status_unsupported'), 'warning');
-    updateLlmProvider('openai-compatible');
   }
+
 }
 
 /**
