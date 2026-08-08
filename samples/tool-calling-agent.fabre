@@ -72,7 +72,7 @@
     {
       "id": "node_llm_2",
       "type": "llm",
-      "title": "LLM Call 2 (Summarizer)",
+      "title": "LLM Call 2 (Synthesizer)",
       "x": 990,
       "y": 160,
       "width": 280,

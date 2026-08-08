@@ -363,7 +363,7 @@ export const DEFAULT_RECENT_FILES = [
         { id: 'node_tool_config_1', type: 'tool_config', title: 'Tool Environment Config', x: 40, y: 440, width: 250, data: { enabledBuiltInTools: ['js_sandbox', 'read_file', 'write_file', 'list_files', 'mock_test', 'mock_search'], requireToolCall: true } },
         { id: 'node_tool_1', type: 'tool', title: 'Tool Exec (Native)', x: 680, y: 160, width: 260, data: { toolType: 'js_sandbox' } },
         { id: 'node_session_1', type: 'session', title: 'Session Manager', x: 680, y: 440, width: 260, data: { systemPrompt: 'You are Fabre Agent. Read tool execution results from history and provide clear natural language answers to the user.', maxHistoryTurns: 10, messages: [] } },
-        { id: 'node_llm_2', type: 'llm', title: 'LLM Call 2 (Summarizer)', x: 990, y: 160, width: 280, data: { systemPrompt: 'Read the tool result in the conversation history and report the final answer to the user in friendly natural language.', temperature: 0.3 } },
+        { id: 'node_llm_2', type: 'llm', title: 'LLM Call 2 (Synthesizer)', x: 990, y: 160, width: 280, data: { systemPrompt: 'Read the tool result in the conversation history and report the final answer to the user in friendly natural language.', temperature: 0.3 } },
         { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 990, y: 440, width: 280, data: {} }
       ],
       links: [
