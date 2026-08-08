@@ -173,6 +173,21 @@ export const DICTIONARY = {
   prop_session_model: { en: 'Model Override (Optional)', ja: 'モデル名の上書き（任意）' },
   prop_session_endpoint: { en: 'Endpoint URL Override (Optional)', ja: 'APIエンドポイントの上書き（任意）' },
   prop_session_max_turns: { en: 'Max History Turns', ja: '最大保持ターン数' },
+
+  // Chrome Built-in AI i18n keys
+  chrome_ai_status_unavailable: { en: 'Chrome Built-in AI status: "{status}". Model is not downloaded or service is unavailable. Check chrome://flags.', ja: 'Chrome 組み込み AI ステータス: "{status}"。モデルがダウンロードされていないか、サービスが停止しています。chrome://flags を確認してください。' },
+  chrome_ai_status_downloading: { en: 'Chrome Built-in AI status: "{status}". Model download required — triggering automatic background download...', ja: 'Chrome 組み込み AI ステータス: "{status}"。モデルのダウンロードが必要です。自動バックグラウンドダウンロードを開始中...' },
+  chrome_ai_status_active: { en: 'Chrome Built-in AI (Gemini Nano) is fully active and ready to execute offline queries.', ja: 'Chrome 組み込み AI (Gemini Nano) が有効です。ローカルAIモデルをオフラインで利用できます。' },
+  chrome_ai_status_unsupported: { en: 'Chrome Built-in AI (window.ai / LanguageModel) is not supported in this browser.', ja: 'Chrome 組み込み AI (window.ai / LanguageModel) はこのブラウザでサポートされていません。' },
+  chrome_ai_download_progress: { en: 'Downloading Chrome AI model (Gemini Nano): {pct}% ({loaded}/{total} bytes)...', ja: 'Chrome AI モデル (Gemini Nano) をダウンロード中: {pct}% ({loaded}/{total} バイト)...' },
+  chrome_ai_download_success: { en: 'Chrome AI model download completed successfully. Ready to use.', ja: 'Chrome AI モデルのダウンロードが完了しました。利用可能です。' },
+  chrome_ai_download_failed: { en: 'Chrome AI model download failed: {error}', ja: 'Chrome AI モデルのダウンロード失敗: {error}' },
+  chrome_ai_executing: { en: 'Executing query via Chrome Built-in AI (Gemini Nano)...', ja: 'Chrome 組み込み AI (Gemini Nano) でクエリを実行中...' },
+  chrome_ai_not_available_error: { en: 'Chrome Built-in AI is not available or model download is in progress.', ja: 'Chrome 組み込み AI が利用不可、またはモデルのダウンロード処理中です。' },
+  chrome_ai_session_created: { en: 'LanguageModel session initialized (temp: {temp}, lang: {lang})', ja: 'LanguageModel セッションを初期化しました (temp: {temp}, lang: {lang})' },
+  chrome_ai_prompt_sending: { en: 'Sending prompt to Chrome AI ({chars} chars)...', ja: 'Chrome AI へプロンプトを送信中 ({chars} 文字)...' },
+  chrome_ai_query_completed: { en: 'Received response from Chrome AI in {duration}ms ({chars} chars)', ja: 'Chrome AI から応答を受信しました ({duration}ms, {chars} 文字)' },
+  chrome_ai_session_destroyed: { en: 'LanguageModel session cleaned up successfully.', ja: 'LanguageModel セッションを正常に解放しました。' },
 };
 
 /**

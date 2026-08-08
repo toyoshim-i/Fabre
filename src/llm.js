@@ -4,6 +4,7 @@
 import { state, getDefaultSystemPrompt, setLlmProvider, normalizeString, normalizeNodeData } from './state.js';
 import { log, showCorsErrorModal, showAlert, applyLanguage } from './ui.js';
 import { getMcpToolsForOpenAi, resolveToolConfig } from './mcp.js';
+import { t } from './i18n.js';
 
 /**
  * Global helper to locate Chrome's Built-in AI interface across changing specifications
@@ -44,50 +45,77 @@ export async function checkChromeAi() {
   
   if (aiModel) {
     try {
-      // Determine availability or capabilities based on spec versions
+      // Determine availability or capabilities based on WICG standard Prompt API spec
       let available = 'no';
       let capabilities = null;
+      const targetLang = state.lang === 'ja' ? 'ja' : 'en';
+      const langOptions = {
+        expectedInputLanguages: ['en', 'ja', 'es', 'fr', 'de'],
+        outputLanguage: targetLang
+      };
       
-      if (typeof aiModel.capabilities === 'function') {
-        capabilities = await aiModel.capabilities();
-        available = capabilities.available || 'no';
-      } else if (typeof aiModel.availability === 'function') {
-        available = await aiModel.availability();
-      } else {
-        // Strict fallback test when functions are missing
-        available = 'no';
+      if (typeof aiModel.availability === 'function') {
+        try {
+          available = await aiModel.availability(langOptions);
+        } catch (e) {
+          try {
+            available = await aiModel.availability();
+          } catch (e2) {
+            available = 'no';
+          }
+        }
       }
       
-      const isAvailable = (available === 'readily' || available === 'after-download' || available === true);
+      if ((available === 'no' || available === 'unavailable' || !available) && typeof aiModel.capabilities === 'function') {
+        try {
+          capabilities = await aiModel.capabilities(langOptions);
+        } catch (e) {
+          try {
+            capabilities = await aiModel.capabilities();
+          } catch (e2) {
+            capabilities = null;
+          }
+        }
+        available = (capabilities && capabilities.available) || available;
+      }
+      
+      const isAvailable = (available === 'available' || available === 'readily' || available === 'after-download' || available === 'downloadable' || available === 'downloading' || available === true);
 
       if (!isAvailable) {
         state.chromeAiAvailable = false;
-        desc.innerText = state.lang === 'en'
-          ? 'Chrome Built-in AI (window.ai) is supported by your browser, but the model is not downloaded or disabled. Enable flags and restart Chrome.'
-          : 'Chrome 組み込み AI (window.ai) はサポートされていますが、モデルのダウンロードが未完了か、無効化されています。フラグの設定を確認してください。';
+        desc.innerText = t('chrome_ai_status_unavailable', { status: available });
         statusBlock.className = 'info-block warning';
         badgeContainer.className = 'status-badge warning';
         badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
         badge.removeAttribute('data-i18n');
-        log('Chrome Built-in AI is disabled or requires model download. Defaulting to OpenAI-compatible API.', 'warning');
+        log(t('chrome_ai_status_unavailable', { status: available }), 'warning');
         updateLlmProvider('openai-compatible');
       } else {
-        state.chromeAiAvailable = true;
-        state.chromeAiCapabilities = capabilities;
-        desc.innerText = state.lang === 'en'
-          ? 'Chrome Built-in AI (Gemini Nano) is fully active and ready to execute offline queries.'
-          : 'Chrome 組み込み AI (Gemini Nano) が有効です。ローカルAIモデルをオフラインで利用できます。';
-        statusBlock.className = 'info-block success';
-        badgeContainer.className = 'status-badge success';
-        badge.innerText = 'LLM: Chrome AI';
-        badge.removeAttribute('data-i18n');
-        log(state.lang === 'en' ? 'Chrome Built-in AI (Gemini Nano) detected successfully.' : 'Chrome 組み込み AI (Gemini Nano) を検出しました。', 'success');
+        const needsDownload = (available === 'after-download' || available === 'downloadable' || available === 'downloading');
+        
+        if (needsDownload) {
+          desc.innerText = t('chrome_ai_status_downloading', { status: available });
+          statusBlock.className = 'info-block warning';
+          badgeContainer.className = 'status-badge warning';
+          badge.innerText = state.lang === 'en' ? 'LLM: Downloading...' : 'LLM: DL中...';
+          log(t('chrome_ai_status_downloading', { status: available }), 'info');
+
+          // Kick automatic model download
+          triggerChromeAiModelDownload(aiModel, desc, statusBlock, badgeContainer, badge);
+        } else {
+          state.chromeAiAvailable = true;
+          state.chromeAiCapabilities = capabilities;
+          desc.innerText = t('chrome_ai_status_active');
+          statusBlock.className = 'info-block success';
+          badgeContainer.className = 'status-badge success';
+          badge.innerText = 'LLM: Chrome AI';
+          badge.removeAttribute('data-i18n');
+          log(t('chrome_ai_status_active'), 'success');
+        }
       }
     } catch (err) {
       state.chromeAiAvailable = false;
-      desc.innerText = state.lang === 'en'
-        ? `Error checking Chrome Built-in AI: ${err.message}. Defaulting to External API.`
-        : `Chrome 組み込み AI の検出エラー: ${err.message}。外部APIを選択してください。`;
+      desc.innerText = `${t('chrome_ai_status_unavailable', { status: 'error' })} (${err.message})`;
       statusBlock.className = 'info-block warning';
       badgeContainer.className = 'status-badge warning';
       badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
@@ -97,15 +125,71 @@ export async function checkChromeAi() {
     }
   } else {
     state.chromeAiAvailable = false;
-    desc.innerText = state.lang === 'en'
-      ? 'Chrome Built-in AI (window.ai) is not supported in this browser. Please use Chrome Dev/Canary with flags enabled or select an external API.'
-      : 'Chrome 組み込み AI (window.ai) はこのブラウザでサポートされていません。Chrome Dev/Canary でフラグを有効にするか、外部APIを指定してください。';
+    desc.innerText = t('chrome_ai_status_unsupported');
     statusBlock.className = 'info-block warning';
     badgeContainer.className = 'status-badge warning';
     badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
     badge.removeAttribute('data-i18n');
-    log('Chrome Built-in AI is not supported. Defaulting to External API.', 'warning');
+    log(t('chrome_ai_status_unsupported'), 'warning');
     updateLlmProvider('openai-compatible');
+  }
+}
+
+/**
+ * Trigger background Chrome AI model download via LanguageModel.create with monitor listener,
+ * updating UI progress and transitioning state to available upon completion.
+ */
+async function triggerChromeAiModelDownload(aiModel, desc, statusBlock, badgeContainer, badge) {
+  try {
+    const targetLang = state.lang === 'ja' ? 'ja' : 'en';
+    const createOptions = {
+      expectedInputLanguages: ['en', 'ja', 'es', 'fr', 'de'],
+      outputLanguage: targetLang,
+      monitor(m) {
+        if (m && typeof m.addEventListener === 'function') {
+          m.addEventListener('downloadprogress', (e) => {
+            const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
+            const progressMsg = t('chrome_ai_download_progress', { pct, loaded: e.loaded, total: e.total });
+            log(progressMsg, 'info');
+            badge.innerText = `LLM: DL ${pct}%`;
+          });
+        }
+      }
+    };
+
+    let session;
+    try {
+      if (typeof aiModel.create === 'function') {
+        session = await aiModel.create(createOptions);
+      } else {
+        session = await aiModel(createOptions);
+      }
+    } catch (createErr) {
+      // Fallback create call with basic language options if monitor throws
+      const basicOptions = { expectedInputLanguages: ['en', 'ja'], outputLanguage: targetLang };
+      if (typeof aiModel.create === 'function') {
+        session = await aiModel.create(basicOptions);
+      } else {
+        session = await aiModel(basicOptions);
+      }
+    }
+
+    // Cleanup kick dummy session
+    if (session && typeof session.destroy === 'function') {
+      session.destroy();
+    }
+
+    // Model download completed successfully -> transition to available state!
+    state.chromeAiAvailable = true;
+    updateLlmProvider('chrome-ai');
+    desc.innerText = t('chrome_ai_download_success');
+    statusBlock.className = 'info-block success';
+    badgeContainer.className = 'status-badge success';
+    badge.innerText = 'LLM: Chrome AI';
+    badge.removeAttribute('data-i18n');
+    log(t('chrome_ai_download_success'), 'success');
+  } catch (err) {
+    log(t('chrome_ai_download_failed', { error: err.message }), 'warning');
   }
 }
 
@@ -476,17 +560,31 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
   if (llmConfig.provider === 'chrome-ai') {
     const aiModel = getChromeAiInterface();
     if (!aiModel || !state.chromeAiAvailable) {
-      throw new Error(state.lang === 'en' ? 'Chrome Built-in AI is not available or enabled.' : 'Chrome 組み込み AI が利用不可または無効です。');
+      throw new Error(t('chrome_ai_not_available_error'));
     }
     
-    // Create new LanguageModel session for isolation
-    const sessionOptions = { temperature: llmConfig.temperature };
+    // Create new LanguageModel session for isolation with language options & download monitor
+    const targetLang = state.lang === 'ja' ? 'ja' : 'en';
+    const sessionOptions = {
+      temperature: llmConfig.temperature,
+      expectedInputLanguages: ['en', 'ja', 'es', 'fr', 'de'],
+      outputLanguage: targetLang,
+      monitor(m) {
+        if (m && typeof m.addEventListener === 'function') {
+          m.addEventListener('downloadprogress', (e) => {
+            const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
+            log(t('chrome_ai_download_progress', { pct, loaded: e.loaded, total: e.total }), 'info');
+          });
+        }
+      }
+    };
     if (systemPrompt) {
       sessionOptions.systemPrompt = systemPrompt;
     }
     
-    log(state.lang === 'en' ? 'Executing query via Chrome Built-in AI (Gemini Nano)...' : 'Chrome 組み込み AI (Gemini Nano) でクエリを実行中...', 'info');
+    log(t('chrome_ai_executing'), 'info');
     
+    const startTime = performance.now();
     let session;
     if (typeof aiModel.create === 'function') {
       session = await aiModel.create(sessionOptions);
@@ -495,22 +593,31 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
       session = await aiModel(sessionOptions);
     }
     
+    log(t('chrome_ai_session_created', { temp: llmConfig.temperature, lang: targetLang }), 'info');
+    
     try {
       const promptText = canonicalMessages
         .filter(m => m.role !== 'system')
         .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
         .join('\n\n');
 
+      const fullPromptPayload = promptText || String(userPrompt);
+      log(t('chrome_ai_prompt_sending', { chars: fullPromptPayload.length }), 'info', fullPromptPayload);
+
       if (typeof session.prompt === 'function') {
-        responseContent = await session.prompt(promptText || String(userPrompt));
+        responseContent = await session.prompt(fullPromptPayload);
       } else if (typeof session.execute === 'function') {
-        responseContent = await session.execute(promptText || String(userPrompt));
+        responseContent = await session.execute(fullPromptPayload);
       } else {
         throw new Error('Unsupported Chrome AI session API version.');
       }
+
+      const duration = Math.round(performance.now() - startTime);
+      log(t('chrome_ai_query_completed', { duration, chars: (responseContent || '').length }), 'success', responseContent);
     } finally {
       if (session && typeof session.destroy === 'function') {
         session.destroy(); // Always cleanup sessions
+        log(t('chrome_ai_session_destroyed'), 'info');
       }
     }
   } else {
