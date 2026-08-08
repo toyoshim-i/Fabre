@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "start": "npx servor . 8080",
+    "dev": "npx servor . 8080",
+    "test": "node --test tests/*.test.js",
+    "test:watch": "node --test --watch tests/*.test.js"
   }
 }
+
