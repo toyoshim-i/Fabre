@@ -578,11 +578,37 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
         }
       }
     };
-    if (systemPrompt) {
-      sessionOptions.systemPrompt = systemPrompt;
+    let effectiveSystemPrompt = systemPrompt || '';
+    let toolsPayload = options.tools;
+    if (!toolsPayload && options.enableTools) {
+      toolsPayload = getAllAvailableToolsForOpenAi();
+    }
+
+    if (options.enableTools && toolsPayload && Array.isArray(toolsPayload) && toolsPayload.length > 0) {
+      const toolDescs = toolsPayload.map(t => {
+        const fn = t.function || t;
+        const params = fn.parameters ? ` Parameters: ${JSON.stringify(fn.parameters)}` : '';
+        return `- ${fn.name}: ${fn.description || ''}${params}`;
+      }).join('\n');
+
+      const reactInstruction = `\n\n[Available Tools]\nYou have access to the following tools:\n${toolDescs}\n\n[Tool Calling Instructions]\nTo call a tool, respond ONLY using the following ReAct format:\nAction: <tool_name>\nAction Input: <input_or_payload>`;
+
+      effectiveSystemPrompt += reactInstruction;
+      log(
+        state.lang === 'en'
+          ? `Injected ReAct tool definitions (${toolsPayload.length} tools) into Chrome AI system prompt.`
+          : `Chrome AI システムプロンプトに ${toolsPayload.length} 個の ReAct ツール定義を自動注入しました。`,
+        'info',
+        `[Injected ReAct System Instruction]\n${reactInstruction}`
+      );
+    }
+
+    if (effectiveSystemPrompt) {
+      sessionOptions.systemPrompt = effectiveSystemPrompt;
     }
     
     log(t('chrome_ai_executing'), 'info');
+
     
     const startTime = performance.now();
     let session;
@@ -663,7 +689,11 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     }
     if (toolsPayload && Array.isArray(toolsPayload) && toolsPayload.length > 0) {
       body.tools = toolsPayload;
+      if (options.requireToolCall) {
+        body.tool_choice = 'required';
+      }
     }
+
 
     const loggedHeaders = { ...headers };
     if (loggedHeaders['Authorization']) {

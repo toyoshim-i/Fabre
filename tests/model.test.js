@@ -620,4 +620,25 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.ok(toolCfgNode.data);
   });
 
+  await t.test('should pass tool_choice required option when requireToolCall is enabled', async () => {
+    const { runLlmQuery } = await import('../src/llm.js');
+    let capturedOptions = null;
+    
+    state.useMockLlm = true;
+    state.mockLlmHandler = async (systemPrompt, userPrompt, options) => {
+      capturedOptions = options;
+      return { type: 'tool_calls', content: '', tool_calls: [{ function: { name: 'js_sandbox', arguments: '{"code":"1+1"}' } }] };
+    };
+
+    try {
+      const res = await runLlmQuery('System', 'User', 0.7, null, { enableTools: true, requireToolCall: true, returnStructured: true });
+      assert.strictEqual(capturedOptions.requireToolCall, true);
+      assert.strictEqual(res.type, 'tool_calls');
+    } finally {
+      state.useMockLlm = false;
+      state.mockLlmHandler = null;
+    }
+  });
+
 });
+
