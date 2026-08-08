@@ -587,21 +587,40 @@ export async function runLlmQuery(systemPrompt, userPrompt, temperature = 0.7, s
     if (options.enableTools && toolsPayload && Array.isArray(toolsPayload) && toolsPayload.length > 0) {
       const toolDescs = toolsPayload.map(t => {
         const fn = t.function || t;
-        const params = fn.parameters ? ` Parameters: ${JSON.stringify(fn.parameters)}` : '';
+        const params = fn.parameters ? ` (Parameters: ${JSON.stringify(fn.parameters.properties || {})})` : '';
         return `- ${fn.name}: ${fn.description || ''}${params}`;
       }).join('\n');
 
-      const reactInstruction = `\n\n[Available Tools]\nYou have access to the following tools:\n${toolDescs}\n\n[Tool Calling Instructions]\nTo call a tool, respond ONLY using the following ReAct format:\nAction: <tool_name>\nAction Input: <input_or_payload>`;
+      const exampleTool = toolsPayload[0]?.function?.name || 'js_sandbox';
+      const exampleArg = exampleTool === 'js_sandbox' ? '123 * 456' : (exampleTool === 'read_file' ? 'app.js' : 'input_value');
+
+      const reactInstruction = `\n\n[CRITICAL INSTRUCTION - TOOL CALLING MANDATE]
+Do NOT answer, calculate, or generate natural language explanations yourself.
+You MUST select an appropriate tool from the list below and respond ONLY using the exact ReAct format below.
+
+[Available Tools]
+${toolDescs}
+
+[Required Response Format]
+Action: <tool_name>
+Action Input: <input_code_or_args>
+
+[FEW-SHOT EXAMPLE]
+User: Compute 123 * 456
+Assistant:
+Action: ${exampleTool}
+Action Input: ${exampleArg}`;
 
       effectiveSystemPrompt += reactInstruction;
       log(
         state.lang === 'en'
-          ? `Injected ReAct tool definitions (${toolsPayload.length} tools) into Chrome AI system prompt.`
-          : `Chrome AI システムプロンプトに ${toolsPayload.length} 個の ReAct ツール定義を自動注入しました。`,
+          ? `Injected Few-shot ReAct Tool Mandate (${toolsPayload.length} tools) into Chrome AI system prompt.`
+          : `Chrome AI システムプロンプトに Few-shot 応答例付き ReAct ツール定義 (${toolsPayload.length} 個) を自動注入しました。`,
         'info',
         `[Injected ReAct System Instruction]\n${reactInstruction}`
       );
     }
+
 
     if (effectiveSystemPrompt) {
       sessionOptions.systemPrompt = effectiveSystemPrompt;
