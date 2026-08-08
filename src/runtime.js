@@ -14,7 +14,8 @@ import {
   addChatMessage,
   clearChatMessages
 } from './state.js';
-import { runLlmQuery, getAllAvailableToolsForOpenAi } from './llm.js?v=3';
+import { runLlmQuery, getAllAvailableToolsForOpenAi, resolveLlmConfig } from './llm.js?v=3';
+
 import { resolveToolConfig } from './mcp.js';
 import { t } from './i18n.js';
 
@@ -547,11 +548,14 @@ export async function evaluateNode(node) {
           state.emit('nodeDataChanged', { id: targetSessionNode.id, key: 'messages', value: targetSessionNode.data.messages, node: targetSessionNode });
         }
 
+        const resolvedConfig = resolveLlmConfig(llmOptions);
+
         addLog(
           state.lang === 'en' ? `LLM Call [${node.title}] output generated` : `LLM呼び出し [${node.title}] の出力完了`,
           'success',
-          `[Input User Prompt]\n${promptInput}\n\n[System Prompt]\n${systemPrompt}\n\n[Effective Model]\n${effectiveModel || state.apiModel || '(Global Default)'}\n\n[Effective Endpoint]\n${effectiveEndpoint || state.apiEndpoint || '(Global Default)'}\n\n[LLM Output Response]\n${outputValue}${node.data.lastToolCall ? `\n\n[Tool Call Payload]\n${node.data.lastToolCall}` : ''}`
+          `[Input User Prompt]\n${promptInput}\n\n[System Prompt]\n${systemPrompt}\n\n[Effective Provider]\n${resolvedConfig.provider}\n\n[Effective Model]\n${resolvedConfig.provider === 'chrome-ai' ? 'Chrome Built-in AI (Gemini Nano)' : resolvedConfig.model}\n\n[Effective Endpoint]\n${resolvedConfig.provider === 'chrome-ai' ? 'window.ai (Local Browser Service)' : resolvedConfig.endpoint}\n\n[LLM Output Response]\n${outputValue}${node.data.lastToolCall ? `\n\n[Tool Call Payload]\n${node.data.lastToolCall}` : ''}`
         );
+
         nextFlowPort = 'flow-success';
       } catch (err) {
         addLog(`[Error in LLM Call ${node.title}]: ${err.message}`, 'error', err.stack);
