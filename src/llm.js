@@ -81,6 +81,8 @@ export async function checkChromeAi() {
       
       const isAvailable = (available === 'available' || available === 'readily' || available === 'after-download' || available === 'downloadable' || available === 'downloading' || available === true);
 
+      const downloadBtn = document.getElementById('download-chrome-ai-btn');
+
       if (!isAvailable) {
         state.chromeAiAvailable = false;
         desc.innerText = t('chrome_ai_status_unavailable', { status: available });
@@ -88,6 +90,7 @@ export async function checkChromeAi() {
         badgeContainer.className = 'status-badge warning';
         badge.innerText = state.lang === 'en' ? 'LLM: Custom API' : 'LLM: 外部API';
         badge.removeAttribute('data-i18n');
+        if (downloadBtn) downloadBtn.style.display = 'none';
         log(t('chrome_ai_status_unavailable', { status: available }), 'warning');
       } else {
         const needsDownload = (available === 'after-download' || available === 'downloadable' || available === 'downloading');
@@ -96,11 +99,13 @@ export async function checkChromeAi() {
           desc.innerText = t('chrome_ai_status_downloading', { status: available });
           statusBlock.className = 'info-block warning';
           badgeContainer.className = 'status-badge warning';
-          badge.innerText = state.lang === 'en' ? 'LLM: Downloading...' : 'LLM: DL中...';
+          badge.innerText = state.lang === 'en' ? 'LLM: Downloadable' : 'LLM: 要DL';
           log(t('chrome_ai_status_downloading', { status: available }), 'info');
 
-          // Kick automatic model download
-          triggerChromeAiModelDownload(aiModel, desc, statusBlock, badgeContainer, badge);
+          // Require explicit User Gesture to start download
+          if (downloadBtn) {
+            downloadBtn.style.display = 'inline-flex';
+          }
         } else {
           state.chromeAiAvailable = true;
           state.chromeAiCapabilities = capabilities;
@@ -109,9 +114,11 @@ export async function checkChromeAi() {
           badgeContainer.className = 'status-badge success';
           badge.innerText = 'LLM: Chrome AI';
           badge.removeAttribute('data-i18n');
+          if (downloadBtn) downloadBtn.style.display = 'none';
           log(t('chrome_ai_status_active'), 'success');
         }
       }
+
     } catch (err) {
       state.chromeAiAvailable = false;
       desc.innerText = `${t('chrome_ai_status_unavailable', { status: 'error' })} (${err.message})`;
@@ -133,11 +140,23 @@ export async function checkChromeAi() {
 
 }
 
+export async function startChromeAiModelDownload() {
+  const badge = document.getElementById('provider-badge-text');
+  const badgeContainer = document.getElementById('provider-badge');
+  const desc = document.getElementById('chrome-ai-desc');
+  const statusBlock = document.getElementById('chrome-ai-status-block');
+  const aiModel = getChromeAiInterface();
+  if (!aiModel || !desc || !badge || !statusBlock) return;
+
+  await triggerChromeAiModelDownload(aiModel, desc, statusBlock, badgeContainer, badge);
+}
+
 /**
  * Trigger background Chrome AI model download via LanguageModel.create with monitor listener,
  * updating UI progress and transitioning state to available upon completion.
  */
 async function triggerChromeAiModelDownload(aiModel, desc, statusBlock, badgeContainer, badge) {
+
   try {
     const targetLang = state.lang === 'ja' ? 'ja' : 'en';
     const createOptions = {

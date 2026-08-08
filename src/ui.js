@@ -27,7 +27,7 @@ import {
   addLog,
   setExecutionDelay
 } from './state.js';
-import { runLlmQuery } from './llm.js?v=3';
+import { runLlmQuery, startChromeAiModelDownload } from './llm.js?v=3';
 import { runWorkflow, stepWorkflow, pauseWorkflow, resetWorkflow, runChatTurn } from './runtime.js';
 import { drawConnections } from './canvas.js?v=4';
 import { t, updateDomTranslations } from './i18n.js';
@@ -1624,6 +1624,12 @@ export function initSettingsUI() {
     provider.value = state.llmProvider;
     provider.addEventListener('change', (e) => setLlmProvider(e.target.value));
   }
+
+  const downloadAiBtn = document.getElementById('download-chrome-ai-btn');
+  if (downloadAiBtn) {
+    downloadAiBtn.addEventListener('click', () => startChromeAiModelDownload());
+  }
+
   
   const url = document.getElementById('settings-api-url');
   if (url) {

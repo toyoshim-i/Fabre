@@ -175,8 +175,10 @@ export const DICTIONARY = {
   prop_session_max_turns: { en: 'Max History Turns', ja: '最大保持ターン数' },
 
   // Chrome Built-in AI i18n keys
-  chrome_ai_status_unavailable: { en: 'Chrome Built-in AI status: "{status}". Model is not downloaded or service is unavailable. Check chrome://flags.', ja: 'Chrome 組み込み AI ステータス: "{status}"。モデルがダウンロードされていないか、サービスが停止しています。chrome://flags を確認してください。' },
-  chrome_ai_status_downloading: { en: 'Chrome Built-in AI status: "{status}". Model download required — triggering automatic background download...', ja: 'Chrome 組み込み AI ステータス: "{status}"。モデルのダウンロードが必要です。自動バックグラウンドダウンロードを開始中...' },
+  chrome_ai_status_unavailable: { en: 'Chrome Built-in AI status: "{status}". Model is not downloaded or service is unavailable. Click "Download Model" below or check chrome://flags.', ja: 'Chrome 組み込み AI ステータス: "{status}"。モデルのダウンロード、または [モデルをダウンロード] ボタンのクリックが必要です。' },
+  chrome_ai_status_downloading: { en: 'Chrome Built-in AI status: "{status}". Click "Download Model" button below to initiate model download.', ja: 'Chrome 組み込み AI ステータス: "{status}"。[モデルをダウンロード] ボタンをクリックしてダウンロードを開始してください。' },
+  btn_download_chrome_ai: { en: '📥 Download Model', ja: '📥 モデルをダウンロード' },
+
   chrome_ai_status_active: { en: 'Chrome Built-in AI (Gemini Nano) is fully active and ready to execute offline queries.', ja: 'Chrome 組み込み AI (Gemini Nano) が有効です。ローカルAIモデルをオフラインで利用できます。' },
   chrome_ai_status_unsupported: { en: 'Chrome Built-in AI (window.ai / LanguageModel) is not supported in this browser.', ja: 'Chrome 組み込み AI (window.ai / LanguageModel) はこのブラウザでサポートされていません。' },
   chrome_ai_download_progress: { en: 'Downloading Chrome AI model (Gemini Nano): {pct}% ({loaded}/{total} bytes)...', ja: 'Chrome AI モデル (Gemini Nano) をダウンロード中: {pct}% ({loaded}/{total} バイト)...' },
