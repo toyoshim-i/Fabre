@@ -298,6 +298,18 @@ export function renderNode(node) {
   } else if (node.type === NODE_TYPES.PROMPT) {
     const displayVal = node.data.promptTemplate ? (node.data.promptTemplate.substring(0, 30) + (node.data.promptTemplate.length > 30 ? '...' : '')) : '';
     html += `<div class="node-field-group"><label data-i18n="prop_prompt_tmpl">Prompt Template</label><div style="font-family: var(--font-mono); font-size:10px; color:var(--text-muted); min-height:16px;">${displayVal || '<i>Empty Template</i>'}</div></div>`;
+  } else if (node.type === NODE_TYPES.LLM) {
+    const tempVal = node.data.temperature !== undefined ? node.data.temperature : 0.7;
+    const retries = node.data.maxRetries || 0;
+    html += `
+      <div class="node-field-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+          <label data-i18n="label_temp">Temperature</label>
+          ${retries > 0 ? `<span class="badge" style="font-size: 9px; padding: 1px 6px; background: rgba(56,189,248,0.2); color: #38bdf8; border-radius: 10px; font-weight: 600;">↻ Retry: ${retries}x</span>` : ''}
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${tempVal}</div>
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.SESSION) {
     const msgs = Array.isArray(node.data.messages) ? node.data.messages : [];
     html += `

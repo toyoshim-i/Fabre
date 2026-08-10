@@ -124,7 +124,7 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.strictEqual(state.logs.some(l => l.type === 'error'), false, 'No error logs should be produced');
   });
 
-  await t.test('4. Self-Debugging Agent Loop (self-fixing-loop.fabre / sample_loop)', async () => {
+  await t.test('4. LLM Error Retry & Fallback Agent (self-fixing-loop.fabre / sample_loop)', async () => {
     clearCanvasState();
     resetWorkflow();
 
@@ -132,14 +132,16 @@ test('Sample Workflows Integration Test Suite (with Mock LLM)', async (t) => {
     assert.ok(sample, 'sample_loop must exist in DEFAULT_RECENT_FILES');
 
     loadWorkflowData(sample.data, sample.title);
-    assert.strictEqual(state.nodes.length, 7);
+    assert.strictEqual(state.nodes.length, 4);
+
+    const primaryLlmNode = state.nodes.find(n => n.id === 'node_llm_1');
+    assert.ok(primaryLlmNode);
+    assert.strictEqual(primaryLlmNode.data.maxRetries, 2);
 
     runWorkflow();
     await new Promise(resolve => setTimeout(resolve, 500));
 
     assert.strictEqual(state.runnerState, 'success');
-    const outputNode = state.nodes.find(n => n.id === 'node_output_1');
-    assert.ok(outputNode);
   });
 
   await t.test('5. Condition Branching & Flow (condition-branching.fabre / sample_cond)', async () => {

@@ -672,6 +672,9 @@ function renderLlmOverrideFormFields(data = {}, prefix = 'prop-node-llm') {
   const currentApiKey = data.apiKeyOverride || '';
   const currentTemp = data.temperatureOverride !== undefined ? data.temperatureOverride : (data.temperature !== undefined ? data.temperature : '');
 
+  const currentMaxRetries = data.maxRetries !== undefined ? data.maxRetries : 0;
+  const currentRetryDelay = data.retryDelay !== undefined ? data.retryDelay : 1000;
+
   const isEn = state.lang === 'en';
 
   return `
@@ -707,6 +710,16 @@ function renderLlmOverrideFormFields(data = {}, prefix = 'prop-node-llm') {
     <div class="form-group">
       <label>${isEn ? 'Temperature Override (0.0 - 1.0)' : 'Temperature 上書き (0.0 - 1.0)'}</label>
       <input type="number" id="${prefix}-temp" class="node-input-text" step="0.1" min="0.0" max="1.0" value="${currentTemp}" placeholder="${isEn ? 'e.g. 0.7 (Inherit if empty)' : '例: 0.7（未入力時は標準）'}">
+    </div>
+
+    <div class="form-group" style="margin-top: 6px;">
+      <label>${t('label_max_retries')}</label>
+      <input type="number" id="${prefix}-max-retries" class="node-input-text" min="0" max="5" step="1" value="${currentMaxRetries}" placeholder="e.g. 2 (0 = Disabled)">
+    </div>
+
+    <div class="form-group" style="margin-top: 6px;">
+      <label>${t('label_retry_delay')}</label>
+      <input type="number" id="${prefix}-retry-delay" class="node-input-text" min="100" max="10000" step="100" value="${currentRetryDelay}" placeholder="e.g. 1000">
     </div>
   `;
 }
@@ -758,7 +771,24 @@ function bindLlmOverrideFormEvents(node, prefix = 'prop-node-llm') {
       }
     });
   }
+
+  const maxRetriesEl = document.getElementById(`${prefix}-max-retries`);
+  if (maxRetriesEl) {
+    maxRetriesEl.addEventListener('input', (e) => {
+      const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+      updateNodeData(node.id, 'maxRetries', val);
+    });
+  }
+
+  const retryDelayEl = document.getElementById(`${prefix}-retry-delay`);
+  if (retryDelayEl) {
+    retryDelayEl.addEventListener('input', (e) => {
+      const val = e.target.value === '' ? 1000 : Math.max(100, parseInt(e.target.value, 10) || 1000);
+      updateNodeData(node.id, 'retryDelay', val);
+    });
+  }
 }
+
 
 /**
  * Render shared Tool Config Form fields (enabled built-in tools, MCP tools, force tool call, and copy app defaults button)

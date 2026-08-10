@@ -640,5 +640,31 @@ test('Model state mutations & events regression tests', async (t) => {
     }
   });
 
+  await t.test('should store maxRetries and retryDelay properties on LLM node data', () => {
+    clearCanvasState();
+    const node = {
+      id: 'node_llm_test',
+      type: NODE_TYPES.LLM,
+      title: 'LLM Node Retry Test',
+      x: 100,
+      y: 100,
+      data: {
+        maxRetries: 2,
+        retryDelay: 500
+      }
+    };
+    addNode(node);
+
+    updateNodeData('node_llm_test', 'maxRetries', 3);
+    updateNodeData('node_llm_test', 'retryDelay', 1500);
+
+    const updatedNode = state.nodes.find(n => n.id === 'node_llm_test');
+    assert.ok(updatedNode);
+    assert.strictEqual(updatedNode.data.maxRetries, 3);
+    assert.strictEqual(updatedNode.data.retryDelay, 1500);
+  });
+
 });
+
+
 

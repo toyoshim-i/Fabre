@@ -129,6 +129,8 @@ export const DICTIONARY = {
   label_prompt_tmpl: { en: 'Prompt Template', ja: 'プロンプトテンプレート' },
   label_sys_prompt: { en: 'System Prompt', ja: 'システムプロンプト' },
   label_temp: { en: 'Temperature', ja: 'Temperature (ランダム性)' },
+  label_max_retries: { en: 'Max Auto Retries on Failure', ja: '失敗時の自動リトライ回数' },
+  label_retry_delay: { en: 'Retry Delay Interval (ms)', ja: 'リトライ間隔 (ms)' },
   label_enable_tools: { en: 'Enable Local Tools (ReAct Mode)', ja: 'ローカルツールの自動呼び出しを有効化 (ReAct)' },
   label_extract_type: { en: 'Extraction Type', ja: '抽出方式' },
   label_extract_pattern: { en: 'Key / Regex / Delimiter Pattern', ja: '抽出キー / 正規表現 / 区切り文字' },
@@ -137,6 +139,9 @@ export const DICTIONARY = {
   label_var_name: { en: 'Variable Name', ja: '変数名' },
   label_tool_type: { en: 'Local Tool Command', ja: '実行ツール' },
   btn_delete_node: { en: 'Delete Node', ja: 'このノードを削除' },
+  llm_auto_retry_attempt: { en: 'LLM [{title}] temporary error occurred. Retrying attempt {attempt}/{max} in {delay}ms... ({error})', ja: 'LLM [{title}] で一時エラーが発生しました。{delay}ms 後に再試行します ({attempt}/{max} 回目)... ({error})' },
+  llm_all_retries_failed: { en: 'LLM [{title}] all {max} retries failed.', ja: 'LLM [{title}] の全 {max} 回のリトライが失敗しました。' },
+
 
   // Modals & Dialogs
   save_meta_modal_title: { en: 'Save Project (.fabre)', ja: 'プロジェクト保存 (.fabre)' },

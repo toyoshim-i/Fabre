@@ -491,8 +491,35 @@ export async function evaluateNode(node) {
         messagesPayload: canonicalMessagesPayload
       };
 
+      const maxRetries = Math.max(0, parseInt(node.data.maxRetries, 10) || 0);
+      const retryDelay = Math.max(100, parseInt(node.data.retryDelay, 10) || 1000);
+
       try {
-        const lastResult = await runLlmQuery(systemPrompt, promptInput, effectiveTemperature, null, llmOptions);
+        let lastResult = null;
+        let lastError = null;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            lastResult = await runLlmQuery(systemPrompt, promptInput, effectiveTemperature, null, llmOptions);
+            lastError = null;
+            break; // Success! Exit retry loop
+          } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries) {
+              addLog(
+                t('llm_auto_retry_attempt', { title: node.title, attempt: attempt + 1, max: maxRetries, delay: retryDelay, error: err.message }),
+                'warning',
+                `[Auto Retry Attempt ${attempt + 1}/${maxRetries}]\nWaiting ${retryDelay}ms before next try...\nError: ${err.message}`
+              );
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+          }
+        }
+
+        if (lastError) {
+          throw lastError;
+        }
+
         outputValue = lastResult.content || '';
 
         // 1. Structured Function Calling (OpenAI / Tool Calls schema)

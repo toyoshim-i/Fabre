@@ -423,41 +423,33 @@ export const DEFAULT_RECENT_FILES = [
   },
   {
     id: 'sample_loop',
-    title: 'Self-Debugging Agent Loop',
-    description: 'True self-healing loop that audits code, runs automated unit tests, and conditionally loops back to fix bugs until tests pass.',
+    title: 'LLM Error Retry & Fallback Agent',
+    description: 'Demonstrates LLM automatic node-level retries and flow-error fallback branching for resilient agent execution.',
     filePath: '../samples/self-fixing-loop.fabre',
     updatedAt: new Date().toISOString(),
     data: {
       format: 'fabre-workflow',
       version: '0.1.0',
       meta: {
-        title: 'Self-Debugging Agent Loop',
-        description: 'True self-healing loop that audits code, runs automated unit tests, and conditionally loops back to fix bugs until tests pass.',
+        title: 'LLM Error Retry & Fallback Agent',
+        description: 'Demonstrates LLM automatic node-level retries and flow-error fallback branching for resilient agent execution.',
         author: 'Fabre Team'
       },
       nodes: [
-        { id: 'node_start_1', type: 'start', title: 'Buggy Code Input', x: 40, y: 160, width: 250, data: { inputValue: "function divide(a, b) { return a / b; } // Bug: Missing division by zero check" } },
-        { id: 'node_prompt_1', type: 'prompt', title: 'Audit & Fix Prompt Builder', x: 330, y: 160, width: 280, data: { promptTemplate: "System Instruction:\nYou are a Senior JS QA Engineer. Review and fix bugs in code:\n{{inputValue}}\n\nOutput fixed JS code in a markdown block like:\n```js\nfunction divide(a, b) { if (b === 0) throw new Error('Division by zero'); return a / b; }\n```" } },
-        { id: 'node_llm_1', type: 'llm', title: 'LLM Fix Generator', x: 640, y: 160, width: 260, data: { temperature: 0.2, enableTools: true } },
-        { id: 'node_extractor_1', type: 'extractor', title: 'Extract Fixed Code', x: 930, y: 160, width: 250, data: { extractorType: 'code_block' } },
-        { id: 'node_tool_1', type: 'tool', title: 'Automated Unit Tests', x: 1220, y: 160, width: 260, data: { toolType: 'mock_test' } },
-        { id: 'node_cond_1', type: 'condition', title: 'Check Test Verdict', x: 1220, y: 440, width: 260, data: { conditionType: 'contains', conditionValue: 'PASS' } },
-        { id: 'node_output_1', type: 'output', title: 'Verified Output Node', x: 1530, y: 440, width: 240, data: {} }
+        { id: 'node_start_1', type: 'start', title: 'User Query Input', x: 40, y: 160, width: 250, data: { inputValue: 'Compute 123 * 456' } },
+        { id: 'node_llm_1', type: 'llm', title: 'Primary LLM Call (With Retry)', x: 340, y: 160, width: 280, data: { systemPrompt: 'You are a primary AI assistant. Solve the user query.', temperature: 0.7, maxRetries: 2, retryDelay: 1000 } },
+        { id: 'node_llm_fallback', type: 'llm', title: 'Fallback LLM Call (On Error)', x: 340, y: 440, width: 280, data: { systemPrompt: 'You are a fallback recovery AI assistant. Provide a safe response for the user query.', temperature: 0.2 } },
+        { id: 'node_stream_1', type: 'stream_view', title: 'Execution Timeline', x: 700, y: 160, width: 280, data: {} }
       ],
       links: [
-        { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f2', fromNode: 'node_prompt_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f3', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_extractor_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f4', fromNode: 'node_extractor_1', fromPort: 'flow-out', toNode: 'node_tool_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f5', fromNode: 'node_tool_1', fromPort: 'flow-out', toNode: 'node_cond_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f_true', fromNode: 'node_cond_1', fromPort: 'flow-true', toNode: 'node_output_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_f_false', fromNode: 'node_cond_1', fromPort: 'flow-false', toNode: 'node_prompt_1', toPort: 'flow-in', type: 'flow' },
-        { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_prompt_1', toPort: 'data-in', type: 'data' },
-        { id: 'link_d2', fromNode: 'node_prompt_1', fromPort: 'prompt-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
-        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_extractor_1', toPort: 'text-in', type: 'data' },
-        { id: 'link_d4', fromNode: 'node_extractor_1', fromPort: 'value-out', toNode: 'node_tool_1', toPort: 'input-in', type: 'data' },
-        { id: 'link_d5', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_cond_1', toPort: 'text-in', type: 'data' },
-        { id: 'link_d6', fromNode: 'node_tool_1', fromPort: 'output-out', toNode: 'node_output_1', toPort: 'text-in', type: 'data' }
+        { id: 'link_f1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_llm_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f_success', fromNode: 'node_llm_1', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f_error', fromNode: 'node_llm_1', fromPort: 'flow-error', toNode: 'node_llm_fallback', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_f_fallback_success', fromNode: 'node_llm_fallback', fromPort: 'flow-success', toNode: 'node_stream_1', toPort: 'flow-in', type: 'flow' },
+        { id: 'link_d1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_llm_1', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d2', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_llm_fallback', toPort: 'prompt-in', type: 'data' },
+        { id: 'link_d3', fromNode: 'node_llm_1', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' },
+        { id: 'link_d4', fromNode: 'node_llm_fallback', fromPort: 'response-out', toNode: 'node_stream_1', toPort: 'text-in', type: 'data' }
       ],
       variables: {}
     }
