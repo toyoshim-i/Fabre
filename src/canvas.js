@@ -195,6 +195,9 @@ export function initCanvasListeners() {
     } else if (node.type === NODE_TYPES.TOOL && key === 'toolType') {
       const cardToolDiv = card.querySelector('.node-body div div');
       if (cardToolDiv) cardToolDiv.innerText = value;
+    } else if (node.type === NODE_TYPES.WAIT && key === 'delayMs') {
+      const cardWaitDiv = card.querySelector('.node-body div div');
+      if (cardWaitDiv) cardWaitDiv.innerText = `${value}ms`;
     } else if (node.type === NODE_TYPES.SESSION) {
       const badge = card.querySelector('.badge');
       if (badge) badge.innerText = `${(node.data.messages || []).length} msgs`;
@@ -329,6 +332,8 @@ export function renderNode(node) {
     html += `<div class="node-field-group"><label data-i18n="prop_cond_type">Rule</label><div>${node.data.conditionType || 'contains'} : "${node.data.conditionValue || ''}"</div></div>`;
   } else if (node.type === NODE_TYPES.TOOL) {
     html += `<div class="node-field-group"><label data-i18n="prop_tool_type">Tool</label><div>${node.data.toolType || 'mock_test'}</div></div>`;
+  } else if (node.type === NODE_TYPES.WAIT) {
+    html += `<div class="node-field-group"><label data-i18n="prop_wait_delay">Delay Interval (ms)</label><div style="font-family: var(--font-mono); font-size:11px; color:var(--text-muted);">${node.data.delayMs !== undefined ? node.data.delayMs : 1000}ms</div></div>`;
   } else if (node.type === NODE_TYPES.STREAM_VIEW) {
     const logs = node.data.streamLogs || [];
     let streamHtml = '';
@@ -787,6 +792,7 @@ export function createNode(type, x, y) {
       conditionValue: 'PASS',
       variableName: type === NODE_TYPES.SET_VAR ? 'current_code' : '',
       toolType: 'mock_test',
+      delayMs: type === NODE_TYPES.WAIT ? 1000 : 1000,
       outputLabel: type === NODE_TYPES.OUTPUT ? 'Verification Report' : '',
       inputValue: type === NODE_TYPES.START ? 'Initial source code here' : '',
       extractorType: 'code_block',

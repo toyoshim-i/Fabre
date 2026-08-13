@@ -29,6 +29,7 @@ export const DICTIONARY = {
   node_condition: { en: 'Condition', ja: '条件分岐' },
   node_set_var: { en: 'Set Var', ja: '変数代入' },
   node_tool: { en: 'Tool Exec', ja: 'ツール実行' },
+  node_wait: { en: 'Wait / Delay', ja: 'Wait / 遅延待機' },
   node_stream_view: { en: 'Stream View', ja: '出力ストリーム表示' },
   node_output: { en: 'Output Node', ja: '出力ノード' },
   btn_send_event: { en: 'Send Event', ja: 'イベント送信' },
@@ -36,6 +37,10 @@ export const DICTIONARY = {
   stream_empty_placeholder: { en: 'Stream timeline output will appear here...', ja: '出力ストリームがここに表示されます...' },
   node_session_history: { en: 'History Memory', ja: '会話履歴メモリ' },
   btn_clear_session: { en: 'Clear History', ja: '履歴クリア' },
+  prop_wait_delay: { en: 'Delay Interval (ms)', ja: '待機時間 (ms)' },
+  wait_delay_started: { en: 'Wait node [{title}] pausing execution for {delay}ms...', ja: 'Waitノード [{title}] が {delay}ms 間待機を開始します...' },
+  wait_delay_completed: { en: 'Wait node [{title}] delay finished ({delay}ms). Resuming flow.', ja: 'Waitノード [{title}] の待機が完了しました ({delay}ms)。処理を再開します。' },
+
 
   // Sidebar Tabs
   tab_runner: { en: 'Runner', ja: '実行制御' },

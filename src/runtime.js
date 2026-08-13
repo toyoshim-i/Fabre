@@ -704,6 +704,20 @@ export async function evaluateNode(node) {
       break;
     }
 
+    case NODE_TYPES.WAIT: {
+      const dataIn = getPortInputValue(node.id, 'data-in') || '';
+      const delayMs = Math.max(0, parseInt(node.data.delayMs, 10) || 1000);
+      
+      addLog(t('wait_delay_started', { title: node.title, delay: delayMs }), 'info');
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      addLog(t('wait_delay_completed', { title: node.title, delay: delayMs }), 'success');
+      
+      outputValue = dataIn;
+      node.data.lastOutputValue = outputValue;
+      break;
+    }
+
+
     case NODE_TYPES.EVENT_WAIT: {
       if (!node.data.pendingEventPayload) {
         setRunnerState('paused');

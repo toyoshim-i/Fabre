@@ -1075,6 +1075,13 @@ export function showNodeProperties(nodeId) {
         </select>
       </div>
     `;
+  } else if (node.type === NODE_TYPES.WAIT) {
+    html += `
+      <div class="form-group">
+        <label>${t.prop_wait_delay}</label>
+        <input type="number" id="prop-wait-delay" class="node-input-text" min="100" max="60000" step="100" value="${node.data.delayMs !== undefined ? node.data.delayMs : 1000}" placeholder="e.g. 1000">
+      </div>
+    `;
   } else if (node.type === NODE_TYPES.OUTPUT) {
     const valText = node.data.lastOutputValue || '';
     html += `
@@ -1217,11 +1224,20 @@ function wirePropertyControls(node) {
     });
   }
 
-  // Tool type select
+  // Tool Node type change
   const toolSelect = document.getElementById('prop-tool-type');
   if (toolSelect) {
     toolSelect.addEventListener('change', (e) => {
       updateNodeData(node.id, 'toolType', e.target.value);
+    });
+  }
+
+  // Wait Node delayMs change
+  const waitDelayInput = document.getElementById('prop-wait-delay');
+  if (waitDelayInput) {
+    waitDelayInput.addEventListener('input', (e) => {
+      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+      updateNodeData(node.id, 'delayMs', val);
     });
   }
 

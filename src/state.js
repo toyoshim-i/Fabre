@@ -627,6 +627,7 @@ export const NODE_TYPES = {
   CONDITION: 'condition',
   SET_VAR: 'set_var',
   TOOL: 'tool',
+  WAIT: 'wait',
   STREAM_VIEW: 'stream_view',
   OUTPUT: 'output'
 };
@@ -642,6 +643,7 @@ export const NODE_COLORS = {
   condition: 'var(--color-condition)',
   set_var: 'var(--color-setvar)',
   tool: 'var(--color-tool)',
+  wait: '#14b8a6',
   stream_view: '#8b5cf6',
   output: 'var(--color-output)'
 };
@@ -657,6 +659,7 @@ export const NODE_ICONS = {
   condition: '⇅',
   set_var: '⛃',
   tool: '🛠',
+  wait: '⏱️',
   stream_view: '💬',
   output: '■'
 };
@@ -763,6 +766,16 @@ export const PORT_TEMPLATES = {
     outputs: [
       { id: 'flow-out', name: 'Next', type: 'flow' },
       { id: 'output-out', name: 'Result', type: 'data' }
+    ]
+  },
+  wait: {
+    inputs: [
+      { id: 'flow-in', name: 'Wait', type: 'flow' },
+      { id: 'data-in', name: 'Pass Through', type: 'data' }
+    ],
+    outputs: [
+      { id: 'flow-out', name: 'Next', type: 'flow' },
+      { id: 'data-out', name: 'Data', type: 'data' }
     ]
   },
   stream_view: {

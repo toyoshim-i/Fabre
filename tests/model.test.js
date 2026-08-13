@@ -664,7 +664,34 @@ test('Model state mutations & events regression tests', async (t) => {
     assert.strictEqual(updatedNode.data.retryDelay, 1500);
   });
 
+  await t.test('should evaluate Wait node, delay execution, and pass data through', async () => {
+    clearCanvasState();
+    resetWorkflow();
+
+    const startNode = { id: 'node_start_1', type: NODE_TYPES.START, title: 'Start', x: 0, y: 0, data: { inputValue: 'hello-wait' } };
+    const waitNode = { id: 'node_wait_1', type: NODE_TYPES.WAIT, title: 'Delay Wait', x: 200, y: 0, data: { delayMs: 50 } };
+    const outputNode = { id: 'node_out_1', type: NODE_TYPES.OUTPUT, title: 'Output', x: 400, y: 0, data: {} };
+
+    addNode(startNode);
+    addNode(waitNode);
+    addNode(outputNode);
+
+    addLink({ id: 'l1', fromNode: 'node_start_1', fromPort: 'flow-out', toNode: 'node_wait_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'l2', fromNode: 'node_wait_1', fromPort: 'flow-out', toNode: 'node_out_1', toPort: 'flow-in', type: 'flow' });
+    addLink({ id: 'ld1', fromNode: 'node_start_1', fromPort: 'data-out', toNode: 'node_wait_1', toPort: 'data-in', type: 'data' });
+    addLink({ id: 'ld2', fromNode: 'node_wait_1', fromPort: 'data-out', toNode: 'node_out_1', toPort: 'text-in', type: 'data' });
+
+    const startTime = Date.now();
+    await stepWorkflow(); // Execute Start
+    await stepWorkflow(); // Execute Wait (50ms delay)
+
+    const elapsed = Date.now() - startTime;
+    assert.ok(elapsed >= 40, `Wait node should pause execution for ~50ms (elapsed: ${elapsed}ms)`);
+    assert.strictEqual(waitNode.data.lastOutputValue, 'hello-wait', 'Wait node should pass input data through to output');
+  });
+
 });
+
 
 
 
